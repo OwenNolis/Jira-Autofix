@@ -32,6 +32,7 @@ jobs:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
         run: |
+          JIRA_DOMAIN="${JIRA_DOMAIN%/}"
           JQL="${JIRA_JQL:-project=${JIRA_PROJECT_KEY} AND status != Done AND labels = needs-code-change ORDER BY created DESC}"
           echo "JQL: $JQL"
 
