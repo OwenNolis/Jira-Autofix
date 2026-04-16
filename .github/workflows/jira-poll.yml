@@ -1,0 +1,187 @@
+name: Jira → GitHub Issues
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      jql_override:
+        description: 'Custom JQL filter (leave empty to use JIRA_JQL_FILTER variable)'
+        required: false
+        default: ''
+
+env:
+  JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
+  JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+  JIRA_JQL: ${{ inputs.jql_override || vars.JIRA_JQL_FILTER }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      - name: Fetch Jira issues
+        id: fetch
+        env:
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          JQL="${JIRA_JQL:-project=${JIRA_PROJECT_KEY} AND status != Done AND labels = needs-code-change ORDER BY created DESC}"
+          echo "JQL: $JQL"
+
+          ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$JQL")
+
+          curl -s \
+            -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            -H "Accept: application/json" \
+            "https://${JIRA_DOMAIN}/rest/api/3/search?jql=${ENCODED}&maxResults=25&fields=summary,description,status,labels,issuetype,priority,created" \
+            > /tmp/jira_issues.json
+
+          TOTAL=$(jq '.total // 0' /tmp/jira_issues.json)
+          echo "Found $TOTAL Jira issues"
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub issues for new Jira issues
+        if: steps.fetch.outputs.total != '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          ADF_PY='
+          import json, sys
+
+          def convert(node):
+              if not isinstance(node, dict): return ""
+              t = node.get("type", "")
+              content = node.get("content", [])
+              text = node.get("text", "")
+              attrs = node.get("attrs", {})
+              marks = node.get("marks", [])
+              result = text
+              for m in marks:
+                  mt = m.get("type", "")
+                  if mt == "strong": result = "**" + result + "**"
+                  elif mt == "em": result = "*" + result + "*"
+                  elif mt == "code": result = "`" + result + "`"
+                  elif mt == "link":
+                      href = m.get("attrs", {}).get("href", "")
+                      result = "[" + result + "](" + href + ")"
+              children = "".join(convert(c) for c in content)
+              if t == "doc": return children
+              elif t == "paragraph": return children + "\n"
+              elif t == "text": return result
+              elif t == "heading":
+                  lvl = attrs.get("level", 1)
+                  return "#" * lvl + " " + children + "\n"
+              elif t in ("bulletList", "orderedList"): return children
+              elif t == "listItem": return "- " + children
+              elif t == "codeBlock":
+                  lang = attrs.get("language", "")
+                  return "```" + lang + "\n" + children + "```\n"
+              elif t == "hardBreak": return "\n"
+              else: return children
+
+          data = json.load(sys.stdin)
+          desc = data.get("fields", {}).get("description")
+          if isinstance(desc, dict):
+              print(convert(desc)[:3000])
+          elif isinstance(desc, str):
+              print(desc[:3000])
+          else:
+              print("No description provided.")
+          '
+
+          BODY_PY='
+          import os, sys
+          key = os.environ["ISSUE_KEY"]
+          url = os.environ["ISSUE_URL"]
+          itype = os.environ["ISSUE_TYPE"]
+          priority = os.environ["PRIORITY"]
+          status = os.environ["STATUS"]
+          desc = os.environ["DESCRIPTION"]
+          print(
+              "<!-- jira-key: " + key + " -->\n"
+              "## Jira: [" + key + "](" + url + ")\n\n"
+              "| Field | Value |\n"
+              "|-------|-------|\n"
+              "| **Type** | " + itype + " |\n"
+              "| **Priority** | " + priority + " |\n"
+              "| **Status** | " + status + " |\n\n"
+              "## Description\n\n"
+              + desc + "\n\n"
+              "---\n"
+              "*Auto-created from Jira. Add label `ai-fix` or comment `!fix` to trigger AI-powered code changes.*"
+          )
+          '
+
+          PAYLOAD_PY='
+          import json, os
+          print(json.dumps({
+              "title": "[" + os.environ["ISSUE_KEY"] + "] " + os.environ["SUMMARY"],
+              "body": os.environ["BODY"],
+              "labels": ["jira:" + os.environ["ISSUE_KEY"], "from-jira"]
+          }))
+          '
+
+          jq -c '.issues[]' /tmp/jira_issues.json | while IFS= read -r issue; do
+            ISSUE_KEY=$(echo "$issue" | jq -r '.key')
+            SUMMARY=$(echo "$issue" | jq -r '.fields.summary')
+            STATUS=$(echo "$issue" | jq -r '.fields.status.name')
+            PRIORITY=$(echo "$issue" | jq -r '.fields.priority.name // "Medium"')
+            ISSUE_TYPE=$(echo "$issue" | jq -r '.fields.issuetype.name // "Task"')
+            ISSUE_URL="https://${JIRA_DOMAIN}/browse/${ISSUE_KEY}"
+
+            echo "--- Processing $ISSUE_KEY: $SUMMARY"
+
+            # Skip if a GitHub issue already exists for this Jira key (open OR closed)
+            EXISTING=$(curl -s \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues?labels=jira:${ISSUE_KEY}&state=all" \
+              | jq 'length')
+
+            if [ "$EXISTING" -gt 0 ]; then
+              echo "⏭️  GitHub issue already exists for $ISSUE_KEY — skipping"
+              continue
+            fi
+
+            # Convert Jira ADF description to Markdown
+            DESCRIPTION=$(echo "$issue" | python3 -c "$ADF_PY")
+
+            # Ensure the per-issue label exists (422 if already present — that is OK)
+            curl -s -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/labels" \
+              -d "{\"name\":\"jira:${ISSUE_KEY}\",\"color\":\"0052CC\",\"description\":\"Linked to Jira ${ISSUE_KEY}\"}" \
+              > /dev/null 2>&1 || true
+
+            # Build issue body
+            BODY=$(ISSUE_KEY="$ISSUE_KEY" ISSUE_URL="$ISSUE_URL" ISSUE_TYPE="$ISSUE_TYPE" \
+                   PRIORITY="$PRIORITY" STATUS="$STATUS" DESCRIPTION="$DESCRIPTION" \
+                   python3 -c "$BODY_PY")
+
+            # Build JSON payload and create GitHub issue
+            RESPONSE=$(ISSUE_KEY="$ISSUE_KEY" SUMMARY="$SUMMARY" BODY="$BODY" python3 -c "$PAYLOAD_PY" | curl -s -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues" \
+              -d @-)
+
+            GH_NUMBER=$(echo "$RESPONSE" | jq -r '.number // empty')
+            GH_URL=$(echo "$RESPONSE" | jq -r '.html_url // empty')
+
+            if [ -n "$GH_NUMBER" ]; then
+              echo "✅ Created GitHub issue #${GH_NUMBER} for ${ISSUE_KEY}: ${GH_URL}"
+            else
+              echo "❌ Failed to create GitHub issue for $ISSUE_KEY"
+              echo "Response: $(echo "$RESPONSE" | head -c 400)"
+            fi
+          done

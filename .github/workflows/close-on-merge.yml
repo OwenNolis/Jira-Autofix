@@ -1,0 +1,88 @@
+# When a PR is merged, extract the Jira key from the PR body and close the Jira issue. The GitHub issue is closed automatically by GitHub because of Fixes #N in the PR body.
+
+name: Close Jira Issue on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  close-jira:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      - name: Extract Jira key from PR body
+        id: find_key
+        run: |
+          PR_BODY='${{ github.event.pull_request.body }}'
+
+          JIRA_KEY=$(printf '%s' "$PR_BODY" \
+            | grep -oP '(?<=<!-- jira-key: )[A-Z]+-[0-9]+(?= -->)' \
+            | head -1 || true)
+
+          if [ -n "$JIRA_KEY" ]; then
+            echo "Found Jira key: $JIRA_KEY"
+            echo "jira_key=$JIRA_KEY" >> $GITHUB_OUTPUT
+          else
+            echo "No Jira key found in PR body — nothing to close"
+            echo "jira_key=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Close Jira issue
+        if: steps.find_key.outputs.jira_key != ''
+        env:
+          JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_DOMAIN:    ${{ vars.JIRA_DOMAIN }}
+          ISSUE_KEY:      ${{ steps.find_key.outputs.jira_key }}
+        run: |
+          echo "Closing Jira issue: $ISSUE_KEY"
+
+          TRANSITIONS=$(curl -s \
+            "https://${JIRA_DOMAIN}/rest/api/3/issue/${ISSUE_KEY}/transitions" \
+            -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}")
+
+          TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r '
+            .transitions[] |
+            select(.name == "Done" or .name == "Closed" or .name == "Resolve Issue") |
+            .id' | head -1)
+
+          if [ -z "$TRANSITION_ID" ]; then
+            echo "❌ No closing transition found for $ISSUE_KEY"
+            echo "Available transitions: $(echo "$TRANSITIONS" | jq -r '.transitions[].name')"
+            exit 0   # Don't fail the workflow — this is a Jira config issue
+          fi
+
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "https://${JIRA_DOMAIN}/rest/api/3/issue/${ISSUE_KEY}/transitions" \
+            -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"transition\": {\"id\": \"${TRANSITION_ID}\"}}")
+
+          if [ "$HTTP" = "204" ]; then
+            echo "✅ Jira issue $ISSUE_KEY closed (HTTP 204)"
+          else
+            echo "⚠️ Unexpected HTTP ${HTTP} when closing $ISSUE_KEY"
+          fi
+
+      - name: Comment on PR with closure confirmation
+        if: steps.find_key.outputs.jira_key != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JIRA_DOMAIN:  ${{ vars.JIRA_DOMAIN }}
+        run: |
+          KEY="${{ steps.find_key.outputs.jira_key }}"
+          URL="https://${JIRA_DOMAIN}/browse/${KEY}"
+
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            -d "{\"body\": \"✅ Jira issue [${KEY}](${URL}) has been closed automatically.\"}"

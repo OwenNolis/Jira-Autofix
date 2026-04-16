@@ -45,6 +45,21 @@ Create a new repository on GitHub. Initialize it with whatever source code it wi
 
 ---
 
+Step 2 — Enable GitHub Actions permissions
+Go to your repo → Settings → Actions → General
+•	Under Workflow permissions → select Read and write permissions
+•	Check Allow GitHub Actions to create and approve pull requests
+•	Click Save
+
+Step 4 — Get your Jira API token
+1.	Open your Jira project (or create a new one — Scrum or Kanban)
+2.	Note your Project key (e.g., PROJ) and domain (e.g., your-org.atlassian.net)
+3.	Go to id.atlassian.com/manage-profile/security/api-tokens
+4.	Click Create API token → copy it
+5.	Make sure your Jira project has a "Closed" transition — the workflow uses this exact name
+
+
+
 ## Step 2 — Configure secrets and variables
 
 Go to **Settings → Secrets and variables → Actions**.
