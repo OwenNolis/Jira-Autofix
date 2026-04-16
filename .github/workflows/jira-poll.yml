@@ -44,6 +44,9 @@ jobs:
             "https://${JIRA_DOMAIN}/rest/api/3/search?jql=${ENCODED}&maxResults=25&fields=summary,description,status,labels,issuetype,priority,created" \
             > /tmp/jira_issues.json
 
+          echo "API response (first 500 chars):"
+          head -c 500 /tmp/jira_issues.json
+
           TOTAL=$(jq '.total // 0' /tmp/jira_issues.json)
           echo "Found $TOTAL Jira issues"
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
