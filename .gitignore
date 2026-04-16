@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Runtime artifacts (produced by ai-issue-fix.sh locally)
+/tmp/
+
+# Secrets (never commit these)
+*.env
+.env*
+k8s/github-credentials-secret.yaml
