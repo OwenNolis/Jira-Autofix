@@ -183,6 +183,28 @@ jobs:
             if [ -n "$GH_NUMBER" ]; then
               echo "✅ Created GitHub issue #${GH_NUMBER} for ${ISSUE_KEY}: ${GH_URL}"
 
+              # Transition Jira issue to "In Progress"
+              TRANSITIONS=$(curl -s \
+                -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+                -H "Accept: application/json" \
+                "https://${JIRA_DOMAIN}/rest/api/3/issue/${ISSUE_KEY}/transitions")
+
+              TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r '
+                .transitions[] |
+                select(.name == "In Progress" or .name == "Start Progress" or .name == "In Development") |
+                .id' | head -1)
+
+              if [ -n "$TRANSITION_ID" ]; then
+                curl -s -X POST \
+                  -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  "https://${JIRA_DOMAIN}/rest/api/3/issue/${ISSUE_KEY}/transitions" \
+                  -d "{\"transition\": {\"id\": \"${TRANSITION_ID}\"}}"
+                echo "🔄 Transitioned ${ISSUE_KEY} to In Progress"
+              else
+                echo "⚠️ No 'In Progress' transition found for ${ISSUE_KEY} — available: $(echo "$TRANSITIONS" | jq -r '.transitions[].name' | tr '\n' ', ')"
+              fi
+
               # Dispatch AI fix workflow for the new issue
               curl -s -X POST \
                 -H "Authorization: Bearer $GITHUB_TOKEN" \
