@@ -5,16 +5,18 @@
 # Usage: ai-issue-fix.sh <github_issue_number>
 #
 # Required env vars:
-#   GEMINI_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY
+#   GITHUB_TOKEN, GITHUB_REPOSITORY
 # Optional:
-#   GEMINI_MODEL  (default: gemini-2.5-flash)
+#   AI_PROVIDER   (default: github — options: github, gemini)
+#   GEMINI_API_KEY, GEMINI_MODEL  (required when AI_PROVIDER=gemini)
 # ──────────────────────────────────────────────────────────────
 
-# This script is the core AI engine. It fetches the issue, builds context from the repo, calls Gemini and writes the file changes to disk.
+# This script is the core AI engine. It fetches the issue, builds context from the repo, calls the AI provider and writes the file changes to disk.
 
 set -euo pipefail
 
 ISSUE_NUMBER="${1:?Usage: ai-issue-fix.sh <issue_number>}"
+AI_PROVIDER="${AI_PROVIDER:-github}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
@@ -105,8 +107,8 @@ fi
 FILE_COUNT=$(echo "$CONTEXT_FILES" | grep -c '^###' || echo 0)
 log_info "Context: ~${TOTAL_CHARS} chars across ${FILE_COUNT} files"
 
-# ── 4. Build Gemini prompt ─────────────────────────────────────
-cat > /tmp/gemini_prompt.txt << PROMPT
+# ── 4. Build AI prompt ────────────────────────────────────────
+cat > /tmp/ai_prompt.txt << PROMPT
 You are an expert software engineer. A GitHub issue describes a required code change. Implement it.
 
 ## Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
@@ -146,57 +148,104 @@ Return this exact structure:
 }
 PROMPT
 
-# ── 5. Call Gemini API ─────────────────────────────────────────
-log_info "Calling Gemini (model: ${GEMINI_MODEL})..."
+# ── 5. Call AI API ────────────────────────────────────────────
+if [ "${AI_PROVIDER}" = "gemini" ]; then
+  log_info "Calling Gemini (model: ${GEMINI_MODEL})..."
 
-REQUEST_JSON=$(jq -n --rawfile text /tmp/gemini_prompt.txt '{
-  contents: [{ parts: [{ text: $text }] }],
-  generationConfig: {
+  REQUEST_JSON=$(jq -n --rawfile text /tmp/ai_prompt.txt '{
+    contents: [{ parts: [{ text: $text }] }],
+    generationConfig: {
+      temperature: 0.15,
+      maxOutputTokens: 8192
+    }
+  }')
+
+  HTTP_CODE=$(curl -sS \
+    -o /tmp/ai_response.json \
+    -w "%{http_code}" \
+    -H "Content-Type: application/json" \
+    -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+    "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent" \
+    -d "$REQUEST_JSON" || echo "000")
+
+  log_info "Gemini HTTP status: ${HTTP_CODE}"
+
+  if [ "$HTTP_CODE" = "429" ]; then
+    log_warning "Gemini quota exceeded (429) — no changes will be made"
+    exit 0
+  fi
+
+  if [ "$HTTP_CODE" != "200" ]; then
+    log_error "Gemini API call failed (HTTP ${HTTP_CODE})"
+    cat /tmp/ai_response.json >&2
+    exit 1
+  fi
+
+else
+  log_info "Calling GitHub Models (gpt-4o-mini)..."
+
+  PROMPT_TEXT=$(cat /tmp/ai_prompt.txt)
+  REQUEST_JSON=$(jq -n --arg prompt "$PROMPT_TEXT" '{
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: "You are an expert software engineer. Return only valid JSON as instructed." },
+      { role: "user", content: $prompt }
+    ],
     temperature: 0.15,
-    maxOutputTokens: 8192
-  }
-}')
+    max_tokens: 8192
+  }')
 
-HTTP_CODE=$(curl -sS \
-  -o /tmp/gemini_response.json \
-  -w "%{http_code}" \
-  -H "Content-Type: application/json" \
-  -H "x-goog-api-key: ${GEMINI_API_KEY}" \
-  "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent" \
-  -d "$REQUEST_JSON" || echo "000")
+  HTTP_CODE=$(curl -sS \
+    -o /tmp/ai_response.json \
+    -w "%{http_code}" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    "https://models.inference.ai.azure.com/chat/completions" \
+    -d "$REQUEST_JSON" || echo "000")
 
-log_info "Gemini HTTP status: ${HTTP_CODE}"
+  log_info "GitHub Models HTTP status: ${HTTP_CODE}"
 
-if [ "$HTTP_CODE" = "429" ]; then
-  log_warning "Gemini quota exceeded (429) — no changes will be made"
-  exit 0
-fi
+  if [ "$HTTP_CODE" = "429" ]; then
+    log_warning "GitHub Models rate limited (429) — no changes will be made"
+    exit 0
+  fi
 
-if [ "$HTTP_CODE" != "200" ]; then
-  log_error "Gemini API call failed (HTTP ${HTTP_CODE})"
-  cat /tmp/gemini_response.json >&2
-  exit 1
+  if [ "$HTTP_CODE" != "200" ]; then
+    log_error "GitHub Models API call failed (HTTP ${HTTP_CODE})"
+    cat /tmp/ai_response.json >&2
+    exit 1
+  fi
 fi
 
 # ── 6. Parse response and apply file changes ───────────────────
-log_info "Parsing Gemini response..."
+log_info "Parsing AI response (provider: ${AI_PROVIDER})..."
 
-python3 << 'PYEOF'
+AI_PROVIDER_ENV="${AI_PROVIDER}" python3 << 'PYEOF'
 import json, sys, os, re
 
-with open('/tmp/gemini_response.json') as f:
+provider = os.environ.get("AI_PROVIDER_ENV", "github")
+
+with open('/tmp/ai_response.json') as f:
     resp = json.load(f)
 
-candidates = resp.get('candidates') or []
-if not candidates:
-    print("[ERROR] No candidates in Gemini response", file=sys.stderr)
-    sys.exit(1)
-
-raw_text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-
-if not raw_text:
-    print("[ERROR] Empty text in Gemini response", file=sys.stderr)
-    sys.exit(1)
+if provider == "gemini":
+    candidates = resp.get('candidates') or []
+    if not candidates:
+        print("[ERROR] No candidates in Gemini response", file=sys.stderr)
+        sys.exit(1)
+    raw_text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+    if not raw_text:
+        print("[ERROR] Empty text in Gemini response", file=sys.stderr)
+        sys.exit(1)
+else:
+    choices = resp.get('choices') or []
+    if not choices:
+        print("[ERROR] No choices in GitHub Models response", file=sys.stderr)
+        sys.exit(1)
+    raw_text = choices[0].get('message', {}).get('content', '')
+    if not raw_text:
+        print("[ERROR] Empty content in GitHub Models response", file=sys.stderr)
+        sys.exit(1)
 
 # Strip markdown code fences if Gemini wrapped the JSON
 clean = re.sub(r'^```(?:json)?\s*\n?', '', raw_text.strip())
@@ -211,11 +260,11 @@ except json.JSONDecodeError:
         try:
             result = json.loads(match.group())
         except Exception as e:
-            print(f"[ERROR] Could not parse JSON from Gemini response: {e}", file=sys.stderr)
+            print(f"[ERROR] Could not parse JSON from AI response: {e}", file=sys.stderr)
             print(f"First 500 chars: {raw_text[:500]}", file=sys.stderr)
             sys.exit(1)
     else:
-        print("[ERROR] No JSON object found in Gemini response", file=sys.stderr)
+        print("[ERROR] No JSON object found in AI response", file=sys.stderr)
         print(f"First 500 chars: {raw_text[:500]}", file=sys.stderr)
         sys.exit(1)
 
@@ -230,7 +279,7 @@ with open('/tmp/ai_analysis.txt', 'w') as f:
     f.write(analysis)
 
 if not changes:
-    print("[WARNING] Gemini returned no file changes")
+    print("[WARNING] AI returned no file changes")
     sys.exit(0)
 
 applied = 0
