@@ -55,7 +55,7 @@
   width: 22px; /* Increased width by 10% */
   height: 22px; /* Increased height by 10% */
   animation: spin 1s linear infinite;
-  margin-top: 10px; /* Adjusted margin to center below button */
+  margin-top: 15px; /* Adjusted margin to center below button */
   background: conic-gradient(from 0deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000);
 }
 
