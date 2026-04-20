@@ -1,4 +1,4 @@
-# Triggered when a GitHub issue is opened, gets the ai-fix label, or when someone comments !fix on an issue. Runs ai-issue-fix.sh, then opens a PR.
+# Triggered when a GitHub issue is opened, gets the ai-fix label, someone comments !fix, or dispatched directly with an issue number.
 
 name: AI Fix from GitHub Issue
 
@@ -7,9 +7,14 @@ on:
     types: [opened, labeled]
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'GitHub issue number to fix'
+        required: true
 
 concurrency:
-  group: ai-fix-issue-${{ github.event.issue.number }}
+  group: ai-fix-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
@@ -17,10 +22,12 @@ jobs:
     runs-on: ubuntu-latest
 
     # Run when:
+    #   • Dispatched directly with an issue number, OR
     #   • An issue is opened, OR
     #   • An issue was labeled with "ai-fix", OR
     #   • A comment starts with "!fix" on a real issue (not a PR)
     if: >
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.action == 'opened') ||
       (github.event_name == 'issues' && github.event.label.name == 'ai-fix') ||
       (github.event_name == 'issue_comment' &&
@@ -45,6 +52,26 @@ jobs:
       - name: Make scripts executable
         run: chmod +x .github/scripts/ai-issue-fix.sh
 
+      - name: Resolve issue number and title
+        id: resolve
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            NUMBER="${{ github.event.inputs.issue_number }}"
+          else
+            NUMBER="${{ github.event.issue.number }}"
+          fi
+
+          TITLE=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${NUMBER}" \
+            | jq -r '.title // "Untitled"')
+
+          echo "number=$NUMBER" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+
       - name: Acknowledge trigger (add 👀 reaction)
         if: github.event_name == 'issue_comment'
         env:
@@ -64,7 +91,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          .github/scripts/ai-issue-fix.sh "${{ github.event.issue.number }}"
+          .github/scripts/ai-issue-fix.sh "${{ steps.resolve.outputs.number }}"
 
       - name: Check for changes
         id: check_changes
@@ -82,8 +109,8 @@ jobs:
         id: create_pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_NUMBER: ${{ steps.resolve.outputs.number }}
+          ISSUE_TITLE: ${{ steps.resolve.outputs.title }}
           JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
         run: |
           PR_BODY_PY='
@@ -204,7 +231,7 @@ jobs:
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.resolve.outputs.number }}/comments" \
             -d "$COMMENT_JSON"
 
       - name: Comment when no changes were produced
@@ -215,5 +242,5 @@ jobs:
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.resolve.outputs.number }}/comments" \
             -d '{"body":"🤖 **AI Analysis Complete** — No code changes were identified for this issue. Provide more detail or use `!fix <extra context>` to give the AI more guidance."}'

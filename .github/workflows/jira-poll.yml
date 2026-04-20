@@ -181,6 +181,14 @@ jobs:
 
             if [ -n "$GH_NUMBER" ]; then
               echo "✅ Created GitHub issue #${GH_NUMBER} for ${ISSUE_KEY}: ${GH_URL}"
+
+              # Dispatch AI fix workflow for the new issue
+              curl -s -X POST \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/${{ github.repository }}/actions/workflows/ai-fix-from-issue.yml/dispatches" \
+                -d "{\"ref\": \"main\", \"inputs\": {\"issue_number\": \"${GH_NUMBER}\"}}"
+              echo "🤖 Dispatched AI fix workflow for issue #${GH_NUMBER}"
             else
               echo "❌ Failed to create GitHub issue for $ISSUE_KEY"
               echo "Response: $(echo "$RESPONSE" | head -c 400)"
