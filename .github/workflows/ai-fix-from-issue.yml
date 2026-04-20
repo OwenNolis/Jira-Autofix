@@ -82,12 +82,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
         run: |
           PR_BODY_PY='
           import json, os, subprocess
 
           issue_num = os.environ["ISSUE_NUMBER"]
           jira_key = os.environ.get("JIRA_KEY", "")
+          jira_domain = os.environ.get("JIRA_DOMAIN", "").rstrip("/")
           analysis = open("/tmp/ai_analysis.txt").read() \
                      if os.path.exists("/tmp/ai_analysis.txt") else "AI-generated fix"
 
@@ -96,10 +98,21 @@ jobs:
               capture_output=True, text=True
           ).stdout.strip().split("\n")
 
+          jira_line = ""
+          if jira_key and jira_domain:
+              jira_url = f"https://{jira_domain}/browse/{jira_key}"
+              jira_line = f"**Jira:** [{jira_key}]({jira_url})"
+          elif jira_key:
+              jira_line = f"**Jira:** {jira_key}"
+
           lines = [
               "## 🤖 AI-Generated Fix",
               "",
-              f"This PR resolves GitHub issue #{issue_num} using Gemini AI analysis.",
+              f"**GitHub issue:** #{issue_num}",
+          ]
+          if jira_line:
+              lines.append(jira_line)
+          lines += [
               "",
               "### Analysis",
               analysis,
@@ -156,7 +169,7 @@ jobs:
           fi
 
           # Build PR body — embed the Jira key so close-on-merge.yml can find it
-          PR_BODY=$(ISSUE_NUMBER="$ISSUE_NUMBER" JIRA_KEY="$JIRA_KEY" python3 -c "$PR_BODY_PY")
+          PR_BODY=$(ISSUE_NUMBER="$ISSUE_NUMBER" JIRA_KEY="$JIRA_KEY" JIRA_DOMAIN="$JIRA_DOMAIN" python3 -c "$PR_BODY_PY")
 
           PR_BODY_JSON=$(echo "$PR_BODY" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
           PR_TITLE_JSON=$(echo "$PR_TITLE" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read().strip()))")
