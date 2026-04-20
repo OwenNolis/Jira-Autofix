@@ -20,9 +20,9 @@ jobs:
 
       - name: Extract Jira key from PR body
         id: find_key
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          PR_BODY='${{ github.event.pull_request.body }}'
-
           JIRA_KEY=$(printf '%s' "$PR_BODY" \
             | grep -oP '(?<=<!-- jira-key: )[A-Z]+-[0-9]+(?= -->)' \
             | head -1 || true)
