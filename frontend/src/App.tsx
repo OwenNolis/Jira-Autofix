@@ -22,6 +22,7 @@ function App() {
           className="order-button" 
           onClick={handleRunAIFix}
           disabled={isLoading}
+          style={{ backgroundColor: 'red' }}
         >
           {isLoading ? 'Processing...' : 'Run AI Fix'}
         </button>
