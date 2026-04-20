@@ -38,6 +38,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      models: read
 
     steps:
       - name: Checkout repository
@@ -89,6 +90,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           .github/scripts/ai-issue-fix.sh "${{ steps.resolve.outputs.number }}"
