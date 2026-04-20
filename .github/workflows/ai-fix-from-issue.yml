@@ -1,10 +1,10 @@
-# Triggered when a GitHub issue gets the ai-fix label or when someone comments !fix on an issue. Runs ai-issue-fix.sh, then opens a PR.
+# Triggered when a GitHub issue is opened, gets the ai-fix label, or when someone comments !fix on an issue. Runs ai-issue-fix.sh, then opens a PR.
 
 name: AI Fix from GitHub Issue
 
 on:
   issues:
-    types: [labeled]
+    types: [opened, labeled]
   issue_comment:
     types: [created]
 
@@ -17,9 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     # Run when:
+    #   • An issue is opened, OR
     #   • An issue was labeled with "ai-fix", OR
     #   • A comment starts with "!fix" on a real issue (not a PR)
     if: >
+      (github.event_name == 'issues' && github.event.action == 'opened') ||
       (github.event_name == 'issues' && github.event.label.name == 'ai-fix') ||
       (github.event_name == 'issue_comment' &&
        startsWith(github.event.comment.body, '!fix') &&
