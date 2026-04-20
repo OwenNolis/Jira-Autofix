@@ -6,7 +6,7 @@ function App() {
       <div className="card">
         <h1>Jira Autofix</h1>
         <p>Trigger an AI-powered fix for your Jira issues.</p>
-        <button onClick={() => alert('Fix triggered!')}>Run AI Fix</button>
+        <button className="order-button" onClick={() => alert('Fix triggered!')}>Run AI Fix</button>
       </div>
     </div>
   );
