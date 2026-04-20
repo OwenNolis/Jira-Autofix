@@ -114,6 +114,7 @@ jobs:
           ISSUE_NUMBER: ${{ steps.resolve.outputs.number }}
           ISSUE_TITLE: ${{ steps.resolve.outputs.title }}
           JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
         run: |
           PR_BODY_PY='
           import json, os, subprocess
@@ -121,6 +122,8 @@ jobs:
           issue_num = os.environ["ISSUE_NUMBER"]
           jira_key = os.environ.get("JIRA_KEY", "")
           jira_domain = os.environ.get("JIRA_DOMAIN", "").rstrip("/")
+          ai_provider = os.environ.get("AI_PROVIDER", "github")
+          ai_label = "gpt-4o-mini via GitHub Models" if ai_provider != "gemini" else "Gemini"
           analysis = open("/tmp/ai_analysis.txt").read() \
                      if os.path.exists("/tmp/ai_analysis.txt") else "AI-generated fix"
 
@@ -140,6 +143,7 @@ jobs:
               "## 🤖 AI-Generated Fix",
               "",
               f"**GitHub issue:** #{issue_num}",
+              f"**AI provider:** {ai_label}",
           ]
           if jira_line:
               lines.append(jira_line)
@@ -200,7 +204,7 @@ jobs:
           fi
 
           # Build PR body — embed the Jira key so close-on-merge.yml can find it
-          PR_BODY=$(ISSUE_NUMBER="$ISSUE_NUMBER" JIRA_KEY="$JIRA_KEY" JIRA_DOMAIN="$JIRA_DOMAIN" python3 -c "$PR_BODY_PY")
+          PR_BODY=$(ISSUE_NUMBER="$ISSUE_NUMBER" JIRA_KEY="$JIRA_KEY" JIRA_DOMAIN="$JIRA_DOMAIN" AI_PROVIDER="$AI_PROVIDER" python3 -c "$PR_BODY_PY")
 
           PR_BODY_JSON=$(echo "$PR_BODY" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
           PR_TITLE_JSON=$(echo "$PR_TITLE" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read().strip()))")
