@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 import './App.css';
 import About from './About';
 import Login from './Login';
+import RunHistory from './RunHistory';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +31,11 @@ function App() {
         clearInterval(countdownIntervalRef.current!);
       }
     }, 1000);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.setItem('isAuthenticated', 'false');
   };
 
   const resetTimeout = () => {
@@ -73,121 +79,43 @@ function App() {
     };
   }, []); // run once on mount only — no warningVisible dependency
 
-  // ── Tab title ────────────────────────────────────────────────
+  // ── Run History ─────────────────────────────────────────────
+  const [runHistoryVisible, setRunHistoryVisible] = useState(() => {
+    return localStorage.getItem('runHistoryVisible') === 'true';
+  });
+
+  const handleRunFix = () => {
+    const history = JSON.parse(localStorage.getItem('runHistory') || '[]');
+    const newEntry = { timestamp: new Date().toISOString(), status: 'Triggered' };
+    const updatedHistory = [newEntry, ...history].slice(0, 5);
+    localStorage.setItem('runHistory', JSON.stringify(updatedHistory));
+  };
+
+  const clearRunHistory = () => {
+    localStorage.removeItem('runHistory');
+    setRunHistoryVisible(false);
+  };
+
   useEffect(() => {
-    document.title = 'Jira Autofix';
-    return () => { document.title = 'Jira Autofix'; };
-  }, []);
+    localStorage.setItem('runHistoryVisible', runHistoryVisible.toString());
+  }, [runHistoryVisible]);
 
-  useEffect(() => {
-    if (!hasStarted.current) { hasStarted.current = true; return; }
-    document.title = isLoading ? 'Processing... | Jira Autofix' : 'Fix Complete | Jira Autofix';
-  }, [isLoading]);
-
-  // ── Dark mode ────────────────────────────────────────────────
-  useEffect(() => {
-    document.body.className = isDarkMode ? 'dark-mode' : '';
-    localStorage.setItem('darkMode', isDarkMode.toString());
-  }, [isDarkMode]);
-
-  // ── Handlers ─────────────────────────────────────────────────
-  const handleRunAIFix = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      alert('AI Fix triggered!');
-      setIsLoading(false);
-    }, 2000);
-  };
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
-
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    localStorage.setItem('isAuthenticated', 'true');
-    resetTimeout();
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('isAuthenticated');
-    if (timeoutRef.current)           clearTimeout(timeoutRef.current);
-    if (warningTimeoutRef.current)    clearTimeout(warningTimeoutRef.current);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-  };
-
-  // ── Protected route helper ───────────────────────────────────
-  const RequireAuth = ({ children }: { children: React.ReactElement }) => {
-    const location = useLocation();
-    if (!isAuthenticated) {
-      return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-    return children;
-  };
-
-  // ── Render ───────────────────────────────────────────────────
   return (
     <Router>
-      <div className="App">
-        {warningVisible && (
-          <div className="session-warning">
-            You will be logged out in <strong>{countdown}</strong> seconds due to inactivity.
-          </div>
-        )}
-        {isAuthenticated && (
-          <nav>
-            <ul>
-              <li><a href="/">Home</a></li>
-              <li><a href="/about">About</a></li>
-              <li><button onClick={handleLogout}>Logout</button></li>
-            </ul>
-          </nav>
+      <div className={`App ${isDarkMode ? 'dark-mode' : ''}`}>
+        <header className="App-header">
+          <button onClick={handleRunFix} className="order-button">Run AI Fix</button>
+          <button onClick={() => setRunHistoryVisible(!runHistoryVisible)} className="order-button">
+            {runHistoryVisible ? 'Hide History' : 'Show History'}
+          </button>
+        </header>
+        {runHistoryVisible && (
+          <RunHistory onClear={clearRunHistory} />
         )}
         <Routes>
-          <Route
-            path="/login"
-            element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
-          />
-          <Route
-            path="/about"
-            element={
-              <RequireAuth>
-                <About />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? (
-                <div>
-                  <div className="card">
-                    <h1>Jira Autofix</h1>
-                    <p>Trigger an AI-powered fix for your Jira issues.</p>
-                    <button
-                      className="order-button"
-                      onClick={handleRunAIFix}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Processing...' : 'Run AI Fix'}
-                    </button>
-                    {isLoading && <div className="spinner"></div>}
-                    <div className="dark-mode-toggle">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={isDarkMode}
-                          onChange={toggleDarkMode}
-                        />
-                        Enable Dark Mode
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
+          <Route path="/about" element={<About />} />
+          <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to="/about" /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </Router>
