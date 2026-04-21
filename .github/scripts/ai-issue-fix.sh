@@ -186,7 +186,7 @@ else
 
   PROMPT_TEXT=$(cat /tmp/ai_prompt.txt)
   REQUEST_JSON=$(jq -n --arg prompt "$PROMPT_TEXT" '{
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: "You are an expert software engineer. Return only valid JSON as instructed." },
       { role: "user", content: $prompt }
