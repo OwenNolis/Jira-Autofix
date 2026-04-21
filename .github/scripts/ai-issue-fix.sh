@@ -299,15 +299,17 @@ HTTP_CODE=$(call_ai /tmp/ai_prompt.txt /tmp/ai_response.json)
 log_info "Implementation API status: ${HTTP_CODE}"
 check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_response.json
 
-# ── 6. Parse response and apply file changes ───────────────────
-log_info "Parsing AI response and applying changes..."
-
-AI_PROVIDER_ENV="${AI_PROVIDER}" python3 << 'PYEOF'
+# ── Helper: parse AI response JSON and apply file changes ──────
+# Usage: apply_ai_response <response_file>
+apply_ai_response() {
+  local response_file="$1"
+  AI_PROVIDER_ENV="${AI_PROVIDER}" RESPONSE_FILE="$response_file" python3 << 'PYEOF'
 import json, sys, os, re
 
-provider = os.environ.get("AI_PROVIDER_ENV", "github")
+provider      = os.environ.get("AI_PROVIDER_ENV", "github")
+response_file = os.environ.get("RESPONSE_FILE", "/tmp/ai_response.json")
 
-with open('/tmp/ai_response.json') as f:
+with open(response_file) as f:
     resp = json.load(f)
 
 if provider == "gemini":
@@ -316,20 +318,17 @@ if provider == "gemini":
         print("[ERROR] No candidates in Gemini response", file=sys.stderr)
         sys.exit(1)
     raw_text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-    if not raw_text:
-        print("[ERROR] Empty text in Gemini response", file=sys.stderr)
-        sys.exit(1)
 else:
     choices = resp.get('choices') or []
     if not choices:
         print("[ERROR] No choices in GitHub Models response", file=sys.stderr)
         sys.exit(1)
     raw_text = choices[0].get('message', {}).get('content', '')
-    if not raw_text:
-        print("[ERROR] Empty content in GitHub Models response", file=sys.stderr)
-        sys.exit(1)
 
-# Strip markdown code fences
+if not raw_text:
+    print("[ERROR] Empty response from AI", file=sys.stderr)
+    sys.exit(1)
+
 clean = re.sub(r'^```(?:json)?\s*\n?', '', raw_text.strip())
 clean = re.sub(r'\n?```\s*$', '', clean.strip())
 
@@ -356,7 +355,6 @@ changes  = result.get('changes', [])
 print(f"[INFO] Analysis: {analysis}")
 print(f"[INFO] Changes: {len(changes)} file(s)")
 
-# Save analysis for the PR description step
 with open('/tmp/ai_analysis.txt', 'w') as f:
     f.write(analysis)
 
@@ -372,8 +370,6 @@ for change in changes:
 
     if not path:
         continue
-
-    # Block path traversal
     if '..' in path or path.startswith('/') or path.startswith('~'):
         print(f"[WARNING] Blocked unsafe path: {path}", file=sys.stderr)
         continue
@@ -397,3 +393,100 @@ for change in changes:
 
 print(f"[SUCCESS] Applied {applied} file change(s)")
 PYEOF
+}
+
+# ── 6. Parse response and apply file changes ───────────────────
+log_info "Parsing AI response and applying changes..."
+apply_ai_response /tmp/ai_response.json
+
+# ── 7. Self-healing error loop ─────────────────────────────────
+MAX_HEAL_ITERATIONS=2
+HEAL_ITERATION=0
+
+# Find TypeScript project root (frontend/ or repo root)
+TSC_DIR=""
+if [ -f "frontend/tsconfig.json" ]; then
+  TSC_DIR="frontend"
+elif [ -f "tsconfig.json" ]; then
+  TSC_DIR="."
+fi
+
+while [ "$HEAL_ITERATION" -lt "$MAX_HEAL_ITERATIONS" ]; do
+  ERRORS=""
+
+  if [ -n "$TSC_DIR" ]; then
+    log_info "Running type check in ${TSC_DIR}..."
+
+    # Install node_modules if missing
+    if [ ! -d "${TSC_DIR}/node_modules" ]; then
+      log_info "Installing dependencies for type check..."
+      (cd "$TSC_DIR" && npm install --silent 2>/dev/null) || true
+    fi
+
+    TSC_OUT=$((cd "$TSC_DIR" && npx tsc --noEmit 2>&1) || true)
+    if [ -n "$TSC_OUT" ]; then
+      log_warning "TypeScript errors found"
+      ERRORS="TypeScript errors:\n${TSC_OUT}"
+    fi
+  fi
+
+  # No errors — we're done
+  if [ -z "$ERRORS" ]; then
+    log_success "No errors found — fix is clean"
+    break
+  fi
+
+  HEAL_ITERATION=$((HEAL_ITERATION + 1))
+  log_warning "Healing pass ${HEAL_ITERATION}/${MAX_HEAL_ITERATIONS}..."
+
+  # Collect current content of all changed files
+  CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+  CHANGED_CONTENTS=""
+  for f in $CHANGED_FILES; do
+    [ -f "$f" ] || continue
+    CHANGED_CONTENTS="${CHANGED_CONTENTS}
+### ${f}
+\`\`\`
+$(cat "$f")
+\`\`\`
+"
+  done
+
+  printf '%s' "You are an expert software engineer. A previous AI fix introduced errors.
+Fix only what is needed to resolve the errors below — do not change the intended behaviour.
+
+## Original Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+
+## Errors to fix
+$(printf '%b' "$ERRORS")
+
+## Current state of changed files
+${CHANGED_CONTENTS}
+
+Rules:
+1. Return ONLY a valid JSON object — no markdown, no text outside the JSON.
+2. Include the COMPLETE file content for every file you modify.
+3. Do not revert the original fix — only correct the errors.
+
+Return this exact structure:
+{
+  \"analysis\": \"What errors you found and how you fixed them\",
+  \"changes\": [
+    {
+      \"file\": \"relative/path/to/file.ext\",
+      \"action\": \"modify\",
+      \"content\": \"complete corrected file content\"
+    }
+  ]
+}" > /tmp/ai_heal_prompt.txt
+
+  HTTP_CODE=$(call_ai /tmp/ai_heal_prompt.txt /tmp/ai_heal_response.json)
+  log_info "Healing API status: ${HTTP_CODE}"
+  check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_heal_response.json
+
+  apply_ai_response /tmp/ai_heal_response.json
+
+  if [ "$HEAL_ITERATION" -ge "$MAX_HEAL_ITERATIONS" ]; then
+    log_warning "Max healing iterations (${MAX_HEAL_ITERATIONS}) reached — some errors may remain"
+  fi
+done
