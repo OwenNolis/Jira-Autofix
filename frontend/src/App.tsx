@@ -4,6 +4,11 @@ import './App.css';
 import About from './About';
 import Login from './Login';
 
+type RunHistoryEntry = {
+  timestamp: string;
+  status: string;
+};
+
 function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -18,6 +23,46 @@ function App() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Run History State
+  const [runHistory, setRunHistory] = useState<RunHistoryEntry[]>(() => {
+    const savedHistory = localStorage.getItem('runHistory');
+    return savedHistory ? JSON.parse(savedHistory) : [];
+  });
+  const [isHistoryVisible, setIsHistoryVisible] = useState(() => {
+    const savedVisibility = localStorage.getItem('isHistoryVisible');
+    return savedVisibility === 'true' || false; // Ensure default is false
+  });
+
+  const handleRunAIFix = () => {
+    setIsLoading(true);
+    const newEntry: RunHistoryEntry = {
+      timestamp: new Date().toISOString(),
+      status: 'Triggered'
+    };
+    const updatedHistory = [newEntry, ...runHistory].slice(0, 5);
+    setRunHistory(updatedHistory);
+    localStorage.setItem('runHistory', JSON.stringify(updatedHistory));
+    setTimeout(() => {
+      alert('AI Fix triggered!');
+      setIsLoading(false);
+    }, 2000);
+  };
+
+  const handleClearHistory = () => {
+    if (window.confirm('Are you sure you want to clear the run history?')) {
+      setRunHistory([]);
+      localStorage.removeItem('runHistory');
+      localStorage.removeItem('isHistoryVisible');
+      setIsHistoryVisible(false); // Explicitly hide the panel after clearing
+    }
+  };
+
+  const toggleHistoryVisibility = () => {
+    const newVisibility = !isHistoryVisible;
+    setIsHistoryVisible(newVisibility);
+    localStorage.setItem('isHistoryVisible', newVisibility.toString());
+  };
 
   // ── Session timeout ──────────────────────────────────────────
   const startCountdown = () => {
@@ -91,13 +136,6 @@ function App() {
   }, [isDarkMode]);
 
   // ── Handlers ─────────────────────────────────────────────────
-  const handleRunAIFix = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      alert('AI Fix triggered!');
-      setIsLoading(false);
-    }, 2000);
-  };
 
   const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
@@ -181,6 +219,33 @@ function App() {
                         Enable Dark Mode
                       </label>
                     </div>
+                    <button
+                      className="order-button"
+                      onClick={toggleHistoryVisibility}
+                    >
+                      {isHistoryVisible ? 'Hide History' : 'Show History'}
+                    </button>
+                    {isHistoryVisible && (
+                      <div className="card">
+                        <h3>Run History</h3>
+                        <ul>
+                          {runHistory.map((entry: RunHistoryEntry, index: number) => (
+                            <li key={index}>
+                              {new Date(entry.timestamp).toLocaleString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })} - {entry.status}
+                            </li>
+                          ))}
+                        </ul>
+                        <button onClick={handleClearHistory} className="order-button">
+                          Clear History
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
