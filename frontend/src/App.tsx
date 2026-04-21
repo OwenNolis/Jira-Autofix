@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import './App.css';
 import About from './About';
 import Login from './Login';
@@ -12,26 +12,53 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('isAuthenticated') === 'true';
   });
-  const hasStarted = useRef(false);
+  const [warningVisible, setWarningVisible] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const resetTimeout = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+
+    setWarningVisible(false);
+
+    warningTimeoutRef.current = setTimeout(() => {
+      setWarningVisible(true);
+    }, 90 * 1000); // Show warning after 90 seconds
+
+    timeoutRef.current = setTimeout(() => {
+      handleLogout();
+    }, 120 * 1000); // Logout after 120 seconds
+  };
 
   useEffect(() => {
-    document.title = 'Jira Autofix';
-    return () => {
-      document.title = 'Jira Autofix';
+    const handleActivity = () => {
+      if (warningVisible) {
+        setWarningVisible(false);
+      }
+      resetTimeout();
     };
-  }, []);
 
-  useEffect(() => {
-    if (!hasStarted.current) {
-      hasStarted.current = true;
-      return;
-    }
-    if (isLoading) {
-      document.title = 'Processing... | Jira Autofix';
-    } else {
-      document.title = 'Fix Complete | Jira Autofix';
-    }
-  }, [isLoading]);
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keypress', handleActivity);
+
+    resetTimeout();
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keypress', handleActivity);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, [warningVisible]);
 
   useEffect(() => {
     document.body.className = isDarkMode ? 'dark-mode' : '';
@@ -40,7 +67,6 @@ function App() {
 
   const handleRunAIFix = () => {
     setIsLoading(true);
-    // Simulate a 2-second processing time
     setTimeout(() => {
       alert('AI Fix triggered!');
       setIsLoading(false);
@@ -54,20 +80,47 @@ function App() {
   const handleLogin = () => {
     setIsAuthenticated(true);
     localStorage.setItem('isAuthenticated', 'true');
+    resetTimeout();
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('isAuthenticated');
+    localStorage.clear(); // Explicitly clear localStorage
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+  };
+
+  const RequireAuth = ({ children }: { children: JSX.Element }) => {
+    const location = useLocation();
+    if (!isAuthenticated) {
+      return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+    return children;
   };
 
   return (
     <Router>
       <div className="App">
+        {warningVisible && (
+          <div className="warning">You will be logged out in 30 seconds due to inactivity</div>
+        )}
         <Routes>
           <Route
             path="/login"
             element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
+          />
+          <Route
+            path="/about"
+            element={
+              <RequireAuth>
+                <About />
+              </RequireAuth>
+            }
           />
           <Route
             path="/"
@@ -99,7 +152,7 @@ function App() {
                           checked={isDarkMode} 
                           onChange={toggleDarkMode} 
                         />
-                        Enable Dark Mode
+                        Dark Mode
                       </label>
                     </div>
                   </div>
@@ -109,7 +162,6 @@ function App() {
               )
             }
           />
-          <Route path="/about" element={isAuthenticated ? <About /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </Router>
