@@ -506,11 +506,9 @@ while [ "$HEAL_ITERATION" -lt "$MAX_HEAL_ITERATIONS" ]; do
   if [ -n "$TSC_DIR" ]; then
     log_info "Running type check in ${TSC_DIR}..."
 
-    # Install node_modules if missing
-    if [ ! -d "${TSC_DIR}/node_modules" ]; then
-      log_info "Installing dependencies for type check..."
-      (cd "$TSC_DIR" && npm install --silent 2>/dev/null) || true
-    fi
+    # Always run npm install to pick up any new packages the AI added
+    log_info "Installing dependencies in ${TSC_DIR}..."
+    (cd "$TSC_DIR" && npm install --silent 2>/dev/null) || true
 
     TSC_OUT=$((cd "$TSC_DIR" && npx tsc --noEmit 2>&1) || true)
     if [ -n "$TSC_OUT" ]; then
