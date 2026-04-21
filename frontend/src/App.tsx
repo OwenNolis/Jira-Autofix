@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import './App.css';
+import About from './About';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
@@ -46,30 +48,46 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <div className="card">
-        <h1>Jira Autofix</h1>
-        <p>Trigger an AI-powered fix for your Jira issues.</p>
-        <button 
-          className="order-button" 
-          onClick={handleRunAIFix}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Processing...' : 'Run AI Fix'}
-        </button>
-        {isLoading && <div className="spinner"></div>}
-        <div className="dark-mode-toggle">
-          <label>
-            <input 
-              type="checkbox" 
-              checked={isDarkMode} 
-              onChange={toggleDarkMode} 
-            />
-            Enable Dark Mode
-          </label>
-        </div>
+    <Router>
+      <div className="App">
+        <nav>
+          <ul>
+            <li><Link to="/">Home</Link></li>
+            <li><Link to="/about">About</Link></li>
+          </ul>
+        </nav>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <div className="card">
+                <h1>Jira Autofix</h1>
+                <p>Trigger an AI-powered fix for your Jira issues.</p>
+                <button 
+                  className="order-button" 
+                  onClick={handleRunAIFix}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Processing...' : 'Run AI Fix'}
+                </button>
+                {isLoading && <div className="spinner"></div>}
+                <div className="dark-mode-toggle">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={isDarkMode} 
+                      onChange={toggleDarkMode} 
+                    />
+                    Enable Dark Mode
+                  </label>
+                </div>
+              </div>
+            }
+          />
+          <Route path="/about" element={<About />} />
+        </Routes>
       </div>
-    </div>
+    </Router>
   );
 }
 
