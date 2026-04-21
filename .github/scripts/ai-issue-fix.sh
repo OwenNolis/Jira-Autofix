@@ -634,8 +634,8 @@ while [ "$HEAL_ITERATION" -lt "$MAX_HEAL_ITERATIONS" ]; do
   HEAL_ITERATION=$((HEAL_ITERATION + 1))
   log_warning "Healing pass ${HEAL_ITERATION}/${MAX_HEAL_ITERATIONS}..."
 
-  # Collect current content of all changed files
-  CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+  # Collect current content of all changed files (tracked + new untracked)
+  CHANGED_FILES=$(git diff --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) || true
   CHANGED_CONTENTS=""
   for f in $CHANGED_FILES; do
     [ -f "$f" ] || continue
@@ -690,8 +690,8 @@ done
 # ── 8. Requirements validation pass ───────────────────────────
 log_info "Step 3/3 — Validating implementation against requirements..."
 
-# Collect current state of all changed files
-CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+# Collect current state of all changed files (tracked + new untracked)
+CHANGED_FILES=$(git diff --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) || true
 CHANGED_CONTENTS=""
 for f in $CHANGED_FILES; do
   [ -f "$f" ] || continue
@@ -713,8 +713,8 @@ else
     VALIDATE_ITERATION=$((VALIDATE_ITERATION + 1))
     log_info "Validation iteration ${VALIDATE_ITERATION}/${MAX_VALIDATE_ITERATIONS}..."
 
-    # Refresh changed file contents each iteration
-    CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+    # Refresh changed file contents each iteration (tracked + new untracked files)
+    CHANGED_FILES=$(git diff --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) || true
     CHANGED_CONTENTS=""
     for f in $CHANGED_FILES; do
       [ -f "$f" ] || continue

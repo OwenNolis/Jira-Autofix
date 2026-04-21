@@ -98,12 +98,14 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          if git diff --quiet && git diff --staged --quiet; then
+          UNTRACKED=$(git ls-files --others --exclude-standard)
+          if git diff --quiet && git diff --staged --quiet && [ -z "$UNTRACKED" ]; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
             echo "No file changes produced"
           else
             echo "has_changes=true" >> $GITHUB_OUTPUT
             git diff --name-only
+            echo "$UNTRACKED"
           fi
 
       - name: Create pull request with AI fixes
