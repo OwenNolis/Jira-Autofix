@@ -80,3 +80,17 @@ body.dark-mode .order-button {
   font-size: 14px;
   cursor: pointer;
 }
+
+.footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 40px;
+  background-color: #f0f0f0;
+  color: #000000;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+body.dark-mode .footer {
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
