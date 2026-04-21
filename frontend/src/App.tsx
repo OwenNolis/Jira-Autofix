@@ -95,7 +95,7 @@ function App() {
     }
   };
 
-  const RequireAuth = ({ children }: { children: JSX.Element }) => {
+  const RequireAuth = ({ children }: { children: React.ReactElement }) => {
     const location = useLocation();
     if (!isAuthenticated) {
       return <Navigate to="/login" state={{ from: location }} replace />;
