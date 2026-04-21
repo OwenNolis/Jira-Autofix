@@ -133,6 +133,15 @@ function App() {
             You will be logged out in <strong>{countdown}</strong> seconds due to inactivity.
           </div>
         )}
+        {isAuthenticated && (
+          <nav>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/about">About</a></li>
+              <li><button onClick={handleLogout}>Logout</button></li>
+            </ul>
+          </nav>
+        )}
         <Routes>
           <Route
             path="/login"
@@ -151,13 +160,6 @@ function App() {
             element={
               isAuthenticated ? (
                 <div>
-                  <nav>
-                    <ul>
-                      <li><a href="/">Home</a></li>
-                      <li><a href="/about">About</a></li>
-                      <li><button onClick={handleLogout}>Logout</button></li>
-                    </ul>
-                  </nav>
                   <div className="card">
                     <h1>Jira Autofix</h1>
                     <p>Trigger an AI-powered fix for your Jira issues.</p>
