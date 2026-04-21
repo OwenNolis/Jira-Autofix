@@ -108,3 +108,17 @@ body.dark-mode .footer {
   font-weight: bold;
   z-index: 1000;
 }
+
+.session-warning {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #ff4d4d;
+  color: #fff;
+  text-align: center;
+  padding: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  z-index: 1000;
+}
