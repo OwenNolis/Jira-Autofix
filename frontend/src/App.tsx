@@ -3,6 +3,9 @@ import './App.css';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('darkMode') === 'true';
+  });
   const hasStarted = useRef(false);
 
   useEffect(() => {
@@ -24,6 +27,11 @@ function App() {
     }
   }, [isLoading]);
 
+  useEffect(() => {
+    document.body.className = isDarkMode ? 'dark-mode' : '';
+    localStorage.setItem('darkMode', isDarkMode.toString());
+  }, [isDarkMode]);
+
   const handleRunAIFix = () => {
     setIsLoading(true);
     // Simulate a 2-second processing time
@@ -31,6 +39,10 @@ function App() {
       alert('AI Fix triggered!');
       setIsLoading(false);
     }, 2000);
+  };
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prevMode) => !prevMode);
   };
 
   return (
@@ -46,6 +58,16 @@ function App() {
           {isLoading ? 'Processing...' : 'Run AI Fix'}
         </button>
         {isLoading && <div className="spinner"></div>}
+        <div className="dark-mode-toggle">
+          <label>
+            <input 
+              type="checkbox" 
+              checked={isDarkMode} 
+              onChange={toggleDarkMode} 
+            />
+            Enable Dark Mode
+          </label>
+        </div>
       </div>
     </div>
   );
