@@ -490,6 +490,107 @@ PYEOF
 log_info "Parsing AI response and applying changes..."
 apply_ai_response /tmp/ai_response.json
 
+# ── 6b. Deletion safety check ──────────────────────────────────
+# If the AI deleted significantly more lines than it added in any file,
+# revert those files and retry with a stricter prompt.
+MAX_DELETION_RETRIES=2
+DELETION_RETRY=0
+
+while [ "$DELETION_RETRY" -lt "$MAX_DELETION_RETRIES" ]; do
+  SUSPICIOUS_FILES=$(git diff --numstat 2>/dev/null | python3 << 'PYEOF'
+import sys
+suspicious = []
+for line in sys.stdin:
+    parts = line.strip().split('\t')
+    if len(parts) != 3:
+        continue
+    added, removed, filename = parts
+    try:
+        a, r = int(added), int(removed)
+        # Flag if more than 20 lines removed AND removed more than added
+        if r > 20 and r > a:
+            suspicious.append(filename)
+    except ValueError:
+        pass
+print('\n'.join(suspicious))
+PYEOF
+  )
+
+  if [ -z "$SUSPICIOUS_FILES" ]; then
+    log_success "Deletion check passed — no suspicious removals"
+    break
+  fi
+
+  DELETION_RETRY=$((DELETION_RETRY + 1))
+  log_warning "Suspicious deletions detected in: $(echo "$SUSPICIOUS_FILES" | tr '\n' ' ')"
+  log_warning "Deletion safety retry ${DELETION_RETRY}/${MAX_DELETION_RETRIES}..."
+
+  # Build context: show original + current broken version for each suspicious file
+  ORIGINAL_CONTENTS=""
+  BROKEN_CONTENTS=""
+  for f in $SUSPICIOUS_FILES; do
+    # Restore original
+    ORIGINAL=$(git show HEAD:"$f" 2>/dev/null || echo "")
+    CURRENT=$(cat "$f" 2>/dev/null || echo "")
+    ORIGINAL_CONTENTS="${ORIGINAL_CONTENTS}
+### ${f} (ORIGINAL — do not remove any of this)
+\`\`\`
+${ORIGINAL}
+\`\`\`
+"
+    BROKEN_CONTENTS="${BROKEN_CONTENTS}
+### ${f} (broken version produced by previous attempt — too much was deleted)
+\`\`\`
+${CURRENT}
+\`\`\`
+"
+    # Revert the file to original
+    git checkout HEAD -- "$f" 2>/dev/null || true
+    log_info "Reverted ${f} to original"
+  done
+
+  printf '%s' "You are an expert software engineer. A previous attempt deleted too much existing code.
+
+## Original Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+
+${ISSUE_BODY}
+
+## ORIGINAL FILES — preserve every line of these exactly
+${ORIGINAL_CONTENTS}
+
+## BROKEN ATTEMPT — what went wrong (for reference only, do not use this)
+${BROKEN_CONTENTS}
+
+## STRICT Rules for this retry:
+1. Return ONLY a valid JSON object — no markdown, no text outside the JSON.
+2. Start from the ORIGINAL file content and only ADD the new feature on top.
+3. Every existing function, route, hook, import, and JSX element must remain.
+4. Do NOT rewrite, reorganise, or remove ANY existing code.
+5. Only insert the minimum new lines required to implement the feature.
+6. Include the COMPLETE file content in your response.
+
+Return this exact structure:
+{
+  \"analysis\": \"What you added and where, without removing anything\",
+  \"changes\": [
+    {
+      \"file\": \"relative/path/to/file.ext\",
+      \"action\": \"modify\",
+      \"content\": \"complete file with original code preserved plus new feature added\"
+    }
+  ]
+}" > /tmp/ai_deletion_retry_prompt.txt
+
+  HTTP_CODE=$(call_ai /tmp/ai_deletion_retry_prompt.txt /tmp/ai_deletion_retry_response.json)
+  log_info "Deletion retry API status: ${HTTP_CODE}"
+  check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_deletion_retry_response.json
+  apply_ai_response /tmp/ai_deletion_retry_response.json
+
+  if [ "$DELETION_RETRY" -ge "$MAX_DELETION_RETRIES" ]; then
+    log_warning "Max deletion retries reached — proceeding with best effort result"
+  fi
+done
+
 # ── 7. Self-healing error loop ─────────────────────────────────
 MAX_HEAL_ITERATIONS=2
 HEAL_ITERATION=0
