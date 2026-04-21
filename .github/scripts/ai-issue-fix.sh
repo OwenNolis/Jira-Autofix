@@ -497,25 +497,29 @@ MAX_DELETION_RETRIES=2
 DELETION_RETRY=0
 
 while [ "$DELETION_RETRY" -lt "$MAX_DELETION_RETRIES" ]; do
-  git diff --numstat 2>/dev/null > /tmp/git_numstat.txt
-  SUSPICIOUS_FILES=$(python3 << 'PYEOF'
+  git diff --numstat 2>/dev/null > /tmp/git_numstat.txt || true
+  python3 - << 'PYEOF' > /tmp/suspicious_files.txt 2>/dev/null || true
 import sys
 suspicious = []
-with open('/tmp/git_numstat.txt') as f:
-    for line in f:
-        parts = line.strip().split('\t')
-        if len(parts) != 3:
-            continue
-        added, removed, filename = parts
-        try:
-            a, r = int(added), int(removed)
-            if r > 20 and r > a:
-                suspicious.append(filename)
-        except ValueError:
-            pass
-print('\n'.join(suspicious))
+try:
+    with open('/tmp/git_numstat.txt') as f:
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) != 3:
+                continue
+            added, removed, filename = parts
+            try:
+                a, r = int(added), int(removed)
+                if r > 20 and r > a:
+                    suspicious.append(filename)
+            except ValueError:
+                pass
+except Exception:
+    pass
+sys.stdout.write('\n'.join(suspicious) + '\n')
+sys.stdout.flush()
 PYEOF
-  )
+  SUSPICIOUS_FILES=$(cat /tmp/suspicious_files.txt 2>/dev/null | tr -d '\n' | xargs) || true
 
   if [ -z "$SUSPICIOUS_FILES" ]; then
     log_success "Deletion check passed — no suspicious removals"
