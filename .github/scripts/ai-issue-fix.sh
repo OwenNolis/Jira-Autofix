@@ -11,7 +11,11 @@
 #   GEMINI_API_KEY, GEMINI_MODEL  (required when AI_PROVIDER=gemini)
 # ──────────────────────────────────────────────────────────────
 
-# This script is the core AI engine. It fetches the issue, builds context from the repo, calls the AI provider and writes the file changes to disk.
+# Two-step process:
+#   Step 1 — Planning: AI reads the issue and file tree, identifies
+#             which files to change and outlines a plan.
+#   Step 2 — Implementation: AI receives the plan + targeted file
+#             contents and produces the actual code changes.
 
 set -euo pipefail
 
@@ -24,6 +28,68 @@ log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1" >&2; }
+
+# ── Helper: call AI API ────────────────────────────────────────
+# Usage: call_ai <prompt_file> <response_file>
+# Returns the HTTP status code.
+call_ai() {
+  local prompt_file="$1"
+  local response_file="$2"
+
+  if [ "${AI_PROVIDER}" = "gemini" ]; then
+    local req
+    req=$(jq -n --rawfile text "$prompt_file" '{
+      contents: [{ parts: [{ text: $text }] }],
+      generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
+    }')
+    curl -sS -o "$response_file" -w "%{http_code}" \
+      -H "Content-Type: application/json" \
+      -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+      "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent" \
+      -d "$req" || echo "000"
+  else
+    local prompt_text req
+    prompt_text=$(cat "$prompt_file")
+    req=$(jq -n --arg p "$prompt_text" '{
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are an expert software engineer. Return only valid JSON as instructed." },
+        { role: "user", content: $p }
+      ],
+      temperature: 0.15,
+      max_tokens: 8192
+    }')
+    curl -sS -o "$response_file" -w "%{http_code}" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      "https://models.inference.ai.azure.com/chat/completions" \
+      -d "$req" || echo "000"
+  fi
+}
+
+# ── Helper: extract text from AI response ─────────────────────
+extract_text() {
+  local response_file="$1"
+  if [ "${AI_PROVIDER}" = "gemini" ]; then
+    jq -r '.candidates[0].content.parts[0].text // ""' "$response_file"
+  else
+    jq -r '.choices[0].message.content // ""' "$response_file"
+  fi
+}
+
+# ── Helper: handle non-200 API responses ──────────────────────
+check_http() {
+  local code="$1" label="$2" response_file="$3"
+  if [ "$code" = "429" ]; then
+    log_warning "${label} rate limited (429) — no changes will be made"
+    exit 0
+  fi
+  if [ "$code" != "200" ]; then
+    log_error "${label} API call failed (HTTP ${code})"
+    cat "$response_file" >&2
+    exit 1
+  fi
+}
 
 # ── 1. Fetch GitHub issue ──────────────────────────────────────
 log_info "Fetching GitHub issue #${ISSUE_NUMBER}..."
@@ -47,30 +113,124 @@ FILE_TREE=$(git ls-files 2>/dev/null \
   | grep -E '\.(ts|tsx|js|jsx|java|py|go|cs|vue|html|css|scss|yaml|yml|json|xml|properties|gradle)$' \
   | sort | head -200)
 
-# ── 3. Collect relevant file contents (keyword scoring) ────────
-log_info "Selecting relevant files..."
+# Always include key structural files for context
+STRUCTURAL_FILES=""
+for f in package.json tsconfig.json public/index.html; do
+  [ -f "$f" ] && STRUCTURAL_FILES="${STRUCTURAL_FILES}
+### ${f}
+\`\`\`
+$(cat "$f")
+\`\`\`
+"
+done
 
+# ── 3. STEP 1 — Planning ───────────────────────────────────────
+log_info "Step 1/2 — Planning which files to change..."
+
+cat > /tmp/ai_plan_prompt.txt << PROMPT
+You are an expert software engineer. A GitHub issue describes a required code change.
+Your job right now is NOT to write code — only to plan.
+
+## Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+
+${ISSUE_BODY}
+
+## Repository File Tree
+\`\`\`
+${FILE_TREE}
+\`\`\`
+
+## Structural Files
+${STRUCTURAL_FILES}
+
+## Instructions
+
+Think step by step about what needs to change to resolve this issue.
+
+Return ONLY a valid JSON object — no markdown, no text outside the JSON:
+{
+  "understanding": "One paragraph: what is this issue asking for?",
+  "files_to_read": ["list of file paths from the tree that are relevant and need to be read"],
+  "plan": "Step-by-step plan of exactly what to change and why"
+}
+PROMPT
+
+HTTP_CODE=$(call_ai /tmp/ai_plan_prompt.txt /tmp/ai_plan_response.json)
+log_info "Planning API status: ${HTTP_CODE}"
+check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_plan_response.json
+
+PLAN_TEXT=$(extract_text /tmp/ai_plan_response.json)
+
+# Parse the plan to get targeted file list and plan text
+read -r TARGETED_FILE_LIST PLAN_SUMMARY <<< "$(echo "$PLAN_TEXT" | python3 << 'PYEOF'
+import json, sys, re
+
+raw = sys.stdin.read().strip()
+clean = re.sub(r'^```(?:json)?\s*\n?', '', raw)
+clean = re.sub(r'\n?```\s*$', '', clean.strip())
+
+try:
+    data = json.loads(clean)
+except Exception:
+    match = re.search(r'\{[\s\S]+\}', clean)
+    data = json.loads(match.group()) if match else {}
+
+files = data.get('files_to_read', [])
+plan  = data.get('plan', '')
+understanding = data.get('understanding', '')
+
+# Write plan to file for later use
+with open('/tmp/ai_plan.txt', 'w') as f:
+    f.write(f"Understanding:\n{understanding}\n\nPlan:\n{plan}")
+
+# Print file list (space-separated) and summary on one line for bash read
+file_list = ' '.join(files)
+print(file_list + '\t' + plan.replace('\n', ' ')[:200])
+PYEOF
+)"
+
+log_info "Plan written to /tmp/ai_plan.txt"
+log_info "Files identified by planner: ${TARGETED_FILE_LIST:-none}"
+
+# ── 4. Gather targeted file contents ──────────────────────────
+log_info "Collecting targeted file contents..."
+
+CONTEXT_FILES=""
+TOTAL_CHARS=0
+MAX_CHARS=70000
+
+# Files identified by the planner
+for file in $TARGETED_FILE_LIST; do
+  [ -f "$file" ] || continue
+  [ "$TOTAL_CHARS" -ge "$MAX_CHARS" ] && break
+  SNIPPET=$(head -c 4000 "$file")
+  CONTEXT_FILES="${CONTEXT_FILES}
+### ${file}
+\`\`\`
+${SNIPPET}
+\`\`\`
+"
+  TOTAL_CHARS=$((TOTAL_CHARS + ${#SNIPPET}))
+done
+
+# Keyword-scored fallback for any remaining budget
 KEYWORDS=$(echo "${ISSUE_TITLE} ${ISSUE_BODY}" \
   | tr '[:upper:]' '[:lower:]' \
   | grep -oE '[a-zA-Z]{4,}' \
   | sort | uniq -c | sort -rn \
   | head -15 | awk '{print $2}')
 
-CONTEXT_FILES=""
-TOTAL_CHARS=0
-MAX_CHARS=70000
-
 while IFS= read -r file; do
   [ -f "$file" ] || continue
   [ "$TOTAL_CHARS" -ge "$MAX_CHARS" ] && break
+  # Skip files already included
+  echo "$CONTEXT_FILES" | grep -q "### ${file}" && continue
 
   SCORE=0
   for kw in $KEYWORDS; do
-    echo "$file" | grep -qi "$kw" 2>/dev/null       && SCORE=$((SCORE + 2))
-    grep -qi "$kw" "$file"         2>/dev/null       && SCORE=$((SCORE + 1))
+    echo "$file" | grep -qi "$kw" 2>/dev/null && SCORE=$((SCORE + 2))
+    grep -qi "$kw" "$file"         2>/dev/null && SCORE=$((SCORE + 1))
   done
-  FILE_CHARS=$(wc -c < "$file" 2>/dev/null || echo 0)
-  [ "$FILE_CHARS" -lt 2000 ] && SCORE=$((SCORE + 1))   # boost small files
 
   if [ "$SCORE" -gt 0 ]; then
     SNIPPET=$(head -c 3000 "$file")
@@ -84,41 +244,27 @@ ${SNIPPET}
   fi
 done <<< "$FILE_TREE"
 
-# Fallback: include smallest files if no keyword hits
-if [ -z "$CONTEXT_FILES" ]; then
-  log_warning "No keyword matches — falling back to smallest files"
-  while IFS= read -r file; do
-    [ -f "$file" ] || continue
-    [ "$TOTAL_CHARS" -ge "$MAX_CHARS" ] && break
-    FILE_CHARS=$(wc -c < "$file" 2>/dev/null || echo 0)
-    if [ "$FILE_CHARS" -lt 3000 ]; then
-      CONTENT=$(cat "$file")
-      CONTEXT_FILES="${CONTEXT_FILES}
-### ${file}
-\`\`\`
-${CONTENT}
-\`\`\`
-"
-      TOTAL_CHARS=$((TOTAL_CHARS + FILE_CHARS))
-    fi
-  done <<< "$FILE_TREE"
-fi
-
 FILE_COUNT=$(echo "$CONTEXT_FILES" | grep -c '^###' || echo 0)
 log_info "Context: ~${TOTAL_CHARS} chars across ${FILE_COUNT} files"
 
-# ── 4. Build AI prompt ────────────────────────────────────────
+# ── 5. STEP 2 — Implementation ────────────────────────────────
+log_info "Step 2/2 — Implementing the plan..."
+
+PLAN_CONTENT=$(cat /tmp/ai_plan.txt 2>/dev/null || echo "No plan available")
+
 cat > /tmp/ai_prompt.txt << PROMPT
-You are an expert software engineer. A GitHub issue describes a required code change. Implement it.
+You are an expert software engineer. Implement the plan below exactly.
 
 ## Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
 
 ${ISSUE_BODY}
 
-## Repository File Tree
-\`\`\`
-${FILE_TREE}
-\`\`\`
+## Plan (from analysis step)
+
+${PLAN_CONTENT}
+
+## Structural Files
+${STRUCTURAL_FILES}
 
 ## Relevant File Contents
 
@@ -126,7 +272,7 @@ ${CONTEXT_FILES}
 
 ## Instructions
 
-Implement the code changes described in the issue above.
+Implement the code changes described in the plan above.
 
 Rules:
 1. Return ONLY a valid JSON object — no markdown, no text outside the JSON.
@@ -134,6 +280,7 @@ Rules:
 3. Follow the existing code style, naming conventions, and project structure.
 4. Only change files necessary to fulfill the issue. Do not refactor unrelated code.
 5. action must be one of: "modify", "create". Do not delete files unless the issue explicitly asks.
+6. Make sure your changes are consistent across all files — if a component is renamed, update all imports too.
 
 Return this exact structure:
 {
@@ -148,77 +295,12 @@ Return this exact structure:
 }
 PROMPT
 
-# ── 5. Call AI API ────────────────────────────────────────────
-if [ "${AI_PROVIDER}" = "gemini" ]; then
-  log_info "Calling Gemini (model: ${GEMINI_MODEL})..."
-
-  REQUEST_JSON=$(jq -n --rawfile text /tmp/ai_prompt.txt '{
-    contents: [{ parts: [{ text: $text }] }],
-    generationConfig: {
-      temperature: 0.15,
-      maxOutputTokens: 8192
-    }
-  }')
-
-  HTTP_CODE=$(curl -sS \
-    -o /tmp/ai_response.json \
-    -w "%{http_code}" \
-    -H "Content-Type: application/json" \
-    -H "x-goog-api-key: ${GEMINI_API_KEY}" \
-    "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent" \
-    -d "$REQUEST_JSON" || echo "000")
-
-  log_info "Gemini HTTP status: ${HTTP_CODE}"
-
-  if [ "$HTTP_CODE" = "429" ]; then
-    log_warning "Gemini quota exceeded (429) — no changes will be made"
-    exit 0
-  fi
-
-  if [ "$HTTP_CODE" != "200" ]; then
-    log_error "Gemini API call failed (HTTP ${HTTP_CODE})"
-    cat /tmp/ai_response.json >&2
-    exit 1
-  fi
-
-else
-  log_info "Calling GitHub Models (gpt-4o-mini)..."
-
-  PROMPT_TEXT=$(cat /tmp/ai_prompt.txt)
-  REQUEST_JSON=$(jq -n --arg prompt "$PROMPT_TEXT" '{
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: "You are an expert software engineer. Return only valid JSON as instructed." },
-      { role: "user", content: $prompt }
-    ],
-    temperature: 0.15,
-    max_tokens: 8192
-  }')
-
-  HTTP_CODE=$(curl -sS \
-    -o /tmp/ai_response.json \
-    -w "%{http_code}" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-    "https://models.inference.ai.azure.com/chat/completions" \
-    -d "$REQUEST_JSON" || echo "000")
-
-  log_info "GitHub Models HTTP status: ${HTTP_CODE}"
-
-  if [ "$HTTP_CODE" = "429" ]; then
-    log_warning "GitHub Models rate limited (429) — no changes will be made"
-    exit 0
-  fi
-
-  if [ "$HTTP_CODE" != "200" ]; then
-    log_error "GitHub Models API call failed (HTTP ${HTTP_CODE})"
-    cat /tmp/ai_response.json >&2
-    exit 1
-  fi
-fi
+HTTP_CODE=$(call_ai /tmp/ai_prompt.txt /tmp/ai_response.json)
+log_info "Implementation API status: ${HTTP_CODE}"
+check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_response.json
 
 # ── 6. Parse response and apply file changes ───────────────────
-log_info "Parsing AI response (provider: ${AI_PROVIDER})..."
+log_info "Parsing AI response and applying changes..."
 
 AI_PROVIDER_ENV="${AI_PROVIDER}" python3 << 'PYEOF'
 import json, sys, os, re
@@ -247,7 +329,7 @@ else:
         print("[ERROR] Empty content in GitHub Models response", file=sys.stderr)
         sys.exit(1)
 
-# Strip markdown code fences if Gemini wrapped the JSON
+# Strip markdown code fences
 clean = re.sub(r'^```(?:json)?\s*\n?', '', raw_text.strip())
 clean = re.sub(r'\n?```\s*$', '', clean.strip())
 
