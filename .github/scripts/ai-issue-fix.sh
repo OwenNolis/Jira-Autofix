@@ -369,6 +369,7 @@ Rules:
 4. Only change files necessary to fulfill the issue. Do not refactor unrelated code.
 5. action must be one of: "modify", "create". Do not delete files unless the issue explicitly asks.
 6. Make sure your changes are consistent across all files — if a component is renamed, update all imports too.
+7. CRITICAL: Preserve ALL existing code that is unrelated to the issue. Do not remove, rewrite, or clean up existing CSS rules, functions, comments, or styles — even if you think they could be improved. Only ADD or MODIFY what the issue specifically requires.
 
 Return this exact structure:
 {
