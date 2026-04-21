@@ -369,7 +369,9 @@ Rules:
 4. Only change files necessary to fulfill the issue. Do not refactor unrelated code.
 5. action must be one of: "modify", "create". Do not delete files unless the issue explicitly asks.
 6. Make sure your changes are consistent across all files — if a component is renamed, update all imports too.
-7. CRITICAL: Preserve ALL existing code that is unrelated to the issue. Do not remove, rewrite, or clean up existing CSS rules, functions, comments, or styles — even if you think they could be improved. Only ADD or MODIFY what the issue specifically requires.
+7. CRITICAL: Preserve ALL existing code that is unrelated to the issue. Do not remove, rewrite, or clean up existing CSS rules, functions, routes, components, comments, or styles — even if you think they could be improved. Only ADD or MODIFY what the issue specifically requires.
+8. CRITICAL: Never remove existing routes, authentication logic, state variables, or UI elements that were already in the file. If a file already has a login flow, dark mode, routing, or other features, keep them 100% intact and only add the new functionality alongside them.
+9. Think of your change as a surgical addition — add the minimum code needed for the new feature and leave everything else exactly as it was.
 
 Return this exact structure:
 {
@@ -554,6 +556,7 @@ Rules:
 1. Return ONLY a valid JSON object — no markdown, no text outside the JSON.
 2. Include the COMPLETE file content for every file you modify.
 3. Do not revert the original fix — only correct the errors.
+4. CRITICAL: Never remove existing routes, components, state, or features. Only fix what is broken.
 
 Return this exact structure:
 {

@@ -14,36 +14,15 @@ function App() {
   });
   const [warningVisible, setWarningVisible] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const hasStarted = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const resetTimeout = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (warningTimeoutRef.current) {
-      clearTimeout(warningTimeoutRef.current);
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-    }
-
-    setWarningVisible(false);
-    setCountdown(30);
-
-    warningTimeoutRef.current = setTimeout(() => {
-      setWarningVisible(true);
-      startCountdown();
-    }, 90 * 1000); // Show warning exactly 30 seconds before logout
-
-    timeoutRef.current = setTimeout(() => {
-      handleLogout();
-    }, 120 * 1000); // Logout after 120 seconds
-  };
-
+  // ── Session timeout ──────────────────────────────────────────
   const startCountdown = () => {
     let timeLeft = 30;
+    setCountdown(timeLeft);
     countdownIntervalRef.current = setInterval(() => {
       timeLeft -= 1;
       setCountdown(timeLeft);
@@ -53,42 +32,65 @@ function App() {
     }, 1000);
   };
 
+  const resetTimeout = () => {
+    if (timeoutRef.current)        clearTimeout(timeoutRef.current);
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+
+    setWarningVisible(false);
+    setCountdown(30);
+
+    warningTimeoutRef.current = setTimeout(() => {
+      setWarningVisible(true);
+      startCountdown();
+    }, 90 * 1000); // show warning 30s before logout
+
+    timeoutRef.current = setTimeout(() => {
+      handleLogout();
+    }, 120 * 1000); // logout after 2 minutes
+  };
+
+  // Activity listeners — use a ref so resetTimeout is always current
+  const resetTimeoutRef = useRef(resetTimeout);
+  useEffect(() => { resetTimeoutRef.current = resetTimeout; });
+
   useEffect(() => {
     const handleActivity = () => {
-      if (warningVisible) {
-        setWarningVisible(false);
-        if (countdownIntervalRef.current) {
-          clearInterval(countdownIntervalRef.current);
-        }
-      }
-      resetTimeout();
+      setWarningVisible(false);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      resetTimeoutRef.current();
     };
 
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('keypress', handleActivity);
 
-    resetTimeout();
-
     return () => {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keypress', handleActivity);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-      }
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
+      if (timeoutRef.current)           clearTimeout(timeoutRef.current);
+      if (warningTimeoutRef.current)    clearTimeout(warningTimeoutRef.current);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
-  }, [warningVisible]);
+  }, []); // run once on mount only — no warningVisible dependency
 
+  // ── Tab title ────────────────────────────────────────────────
+  useEffect(() => {
+    document.title = 'Jira Autofix';
+    return () => { document.title = 'Jira Autofix'; };
+  }, []);
+
+  useEffect(() => {
+    if (!hasStarted.current) { hasStarted.current = true; return; }
+    document.title = isLoading ? 'Processing... | Jira Autofix' : 'Fix Complete | Jira Autofix';
+  }, [isLoading]);
+
+  // ── Dark mode ────────────────────────────────────────────────
   useEffect(() => {
     document.body.className = isDarkMode ? 'dark-mode' : '';
     localStorage.setItem('darkMode', isDarkMode.toString());
   }, [isDarkMode]);
 
+  // ── Handlers ─────────────────────────────────────────────────
   const handleRunAIFix = () => {
     setIsLoading(true);
     setTimeout(() => {
@@ -97,9 +99,7 @@ function App() {
     }, 2000);
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode((prevMode) => !prevMode);
-  };
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -110,18 +110,12 @@ function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('isAuthenticated');
-    localStorage.clear(); // Explicitly clear localStorage
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (warningTimeoutRef.current) {
-      clearTimeout(warningTimeoutRef.current);
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-    }
+    if (timeoutRef.current)           clearTimeout(timeoutRef.current);
+    if (warningTimeoutRef.current)    clearTimeout(warningTimeoutRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
   };
 
+  // ── Protected route helper ───────────────────────────────────
   const RequireAuth = ({ children }: { children: React.ReactElement }) => {
     const location = useLocation();
     if (!isAuthenticated) {
@@ -130,6 +124,7 @@ function App() {
     return children;
   };
 
+  // ── Render ───────────────────────────────────────────────────
   return (
     <Router>
       <div className="App">
@@ -138,16 +133,11 @@ function App() {
             You will be logged out in <strong>{countdown}</strong> seconds due to inactivity.
           </div>
         )}
-        <header className="App-header">
-          <button onClick={toggleDarkMode} className="dark-mode-toggle">
-            Toggle Dark Mode
-          </button>
-          <button onClick={handleRunAIFix} disabled={isLoading} className="order-button">
-            {isLoading ? <span className="spinner" /> : 'Run AI Fix'}
-          </button>
-        </header>
         <Routes>
-          <Route path="/login" element={<Login onLogin={handleLogin} />} />
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
+          />
           <Route
             path="/about"
             element={
@@ -156,7 +146,50 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <div>
+                  <nav>
+                    <ul>
+                      <li><a href="/">Home</a></li>
+                      <li><a href="/about">About</a></li>
+                      <li><button onClick={handleLogout}>Logout</button></li>
+                    </ul>
+                  </nav>
+                  <div className="card">
+                    <h1>Jira Autofix</h1>
+                    <p>Trigger an AI-powered fix for your Jira issues.</p>
+                    <button
+                      className="order-button"
+                      onClick={handleRunAIFix}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Processing...' : 'Run AI Fix'}
+                    </button>
+                    {isLoading && <div className="spinner"></div>}
+                    <div className="dark-mode-toggle">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={isDarkMode}
+                          onChange={toggleDarkMode}
+                        />
+                        Enable Dark Mode
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
         </Routes>
+        <footer className="footer">
+          Powered by Copilot or Gemini | <a href="https://github.com/OwenNolis/Jira-Autofix">GitHub</a>
+        </footer>
       </div>
     </Router>
   );
