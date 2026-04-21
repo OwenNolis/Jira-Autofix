@@ -213,6 +213,94 @@ ${SNIPPET}
   TOTAL_CHARS=$((TOTAL_CHARS + ${#SNIPPET}))
 done
 
+# Import following — follow imports from planner-identified files
+# up to 2 levels deep, capped at 20 additional files
+log_info "Following imports from planner-identified files..."
+
+IMPORT_FILE_LIST=$(SEED_FILES="$TARGETED_FILE_LIST" python3 << 'PYEOF'
+import re, os, sys
+
+EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.css', '.scss']
+MAX_DEPTH  = 2
+MAX_FILES  = 20
+
+def resolve_import(base_file, import_path):
+    """Resolve a relative import to an actual file path."""
+    # Ignore node_modules and non-relative imports
+    if not import_path.startswith('.'):
+        return None
+    base_dir  = os.path.dirname(base_file)
+    candidate = os.path.normpath(os.path.join(base_dir, import_path))
+    # Exact match (e.g. .css files)
+    if os.path.isfile(candidate):
+        return candidate
+    # Try adding extensions
+    for ext in EXTENSIONS:
+        if os.path.isfile(candidate + ext):
+            return candidate + ext
+    # Try index files (e.g. import from './Button' → Button/index.tsx)
+    for ext in EXTENSIONS:
+        index = os.path.join(candidate, 'index' + ext)
+        if os.path.isfile(index):
+            return index
+    return None
+
+def get_imports(file_path):
+    """Extract relative import paths from a file."""
+    try:
+        content = open(file_path, encoding='utf-8', errors='ignore').read()
+    except Exception:
+        return []
+    patterns = [
+        r'import\s+.*?\s+from\s+[\'"]([^\'"]+)[\'"]',
+        r'import\s+[\'"]([^\'"]+)[\'"]',
+        r'require\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)',
+    ]
+    paths = []
+    for pat in patterns:
+        paths.extend(re.findall(pat, content))
+    return paths
+
+seed_files = os.environ.get('SEED_FILES', '').split()
+visited    = set(seed_files)
+queue      = [(f, 0) for f in seed_files if os.path.isfile(f)]
+found      = []
+
+while queue and len(found) < MAX_FILES:
+    file_path, depth = queue.pop(0)
+    if depth >= MAX_DEPTH:
+        continue
+    for imp in get_imports(file_path):
+        resolved = resolve_import(file_path, imp)
+        if resolved and resolved not in visited:
+            visited.add(resolved)
+            found.append(resolved)
+            queue.append((resolved, depth + 1))
+            if len(found) >= MAX_FILES:
+                break
+
+print('\n'.join(found))
+PYEOF
+)
+
+IMPORT_COUNT=0
+for file in $IMPORT_FILE_LIST; do
+  [ -f "$file" ] || continue
+  [ "$TOTAL_CHARS" -ge "$MAX_CHARS" ] && break
+  # Skip files already included
+  echo "$CONTEXT_FILES" | grep -q "### ${file}" && continue
+  SNIPPET=$(head -c 3000 "$file")
+  CONTEXT_FILES="${CONTEXT_FILES}
+### ${file} (via import)
+\`\`\`
+${SNIPPET}
+\`\`\`
+"
+  TOTAL_CHARS=$((TOTAL_CHARS + ${#SNIPPET}))
+  IMPORT_COUNT=$((IMPORT_COUNT + 1))
+done
+log_info "Import following added ${IMPORT_COUNT} file(s)"
+
 # Keyword-scored fallback for any remaining budget
 KEYWORDS=$(echo "${ISSUE_TITLE} ${ISSUE_BODY}" \
   | tr '[:upper:]' '[:lower:]' \
