@@ -640,13 +640,15 @@ If there are gaps, return satisfied: false and include the fixes in changes:
   log_info "Validation API status: ${HTTP_CODE}"
   check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_validate_response.json
 
-  # Parse validation response
-  VALIDATION_TEXT=$(extract_text /tmp/ai_validate_response.json)
+  # Parse validation response — write to file first to avoid pipe+heredoc conflict
+  extract_text /tmp/ai_validate_response.json > /tmp/ai_validation_text.txt
 
-  SATISFIED=$(echo "$VALIDATION_TEXT" | python3 << 'PYEOF'
+  SATISFIED=$(AI_PROVIDER_ENV="${AI_PROVIDER}" python3 << 'PYEOF'
 import json, sys, re, os
 
-raw = sys.stdin.read().strip()
+with open('/tmp/ai_validation_text.txt') as f:
+    raw = f.read().strip()
+
 clean = re.sub(r'^```(?:json)?\s*\n?', '', raw)
 clean = re.sub(r'\n?```\s*$', '', clean.strip())
 
@@ -660,10 +662,10 @@ satisfied = data.get('satisfied', True)
 gaps      = data.get('gaps', [])
 analysis  = data.get('analysis', '')
 
-print(f"[INFO] Validation: {'PASSED' if satisfied else 'FAILED'}")
+print(f"[INFO] Validation: {'PASSED' if satisfied else 'FAILED'}", file=sys.stderr)
 if gaps:
     for gap in gaps:
-        print(f"[WARNING] Gap: {gap}")
+        print(f"[WARNING] Gap: {gap}", file=sys.stderr)
 
 # Save validation result for PR description
 with open('/tmp/ai_validation.txt', 'w') as f:
@@ -686,51 +688,7 @@ PYEOF
 
   if echo "$SATISFIED" | grep -q "NEEDS_FIX"; then
     log_warning "Requirements gaps found — applying fixes..."
-    # Write a mock response file in the same format apply_ai_response expects
-    AI_PROVIDER_ENV="${AI_PROVIDER}" RESPONSE_FILE=/tmp/ai_validate_response.json python3 << 'PYEOF'
-import json, sys, os, re
-
-provider      = os.environ.get("AI_PROVIDER_ENV", "github")
-response_file = os.environ.get("RESPONSE_FILE", "/tmp/ai_validate_response.json")
-
-with open(response_file) as f:
-    resp = json.load(f)
-
-if provider == "gemini":
-    raw_text = resp.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-else:
-    raw_text = resp.get('choices', [{}])[0].get('message', {}).get('content', '')
-
-clean = re.sub(r'^```(?:json)?\s*\n?', '', raw_text.strip())
-clean = re.sub(r'\n?```\s*$', '', clean.strip())
-
-try:
-    result = json.loads(clean)
-except Exception:
-    match = re.search(r'\{[\s\S]+\}', clean)
-    result = json.loads(match.group()) if match else {}
-
-changes = result.get('changes', [])
-if not changes:
-    sys.exit(0)
-
-applied = 0
-for change in changes:
-    path    = (change.get('file') or '').strip()
-    action  = change.get('action', 'modify')
-    content = change.get('content', '')
-    if not path or '..' in path or path.startswith('/') or path.startswith('~'):
-        continue
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as f:
-        f.write(content)
-    print(f"[SUCCESS] {'Created' if action == 'create' else 'Fixed'}: {path}")
-    applied += 1
-
-print(f"[SUCCESS] Applied {applied} validation fix(es)")
-PYEOF
+    apply_ai_response /tmp/ai_validate_response.json
     log_success "Validation fixes applied"
   else
     log_success "All requirements satisfied — implementation is complete"
