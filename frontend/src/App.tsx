@@ -187,9 +187,6 @@ function App() {
             }
           />
         </Routes>
-        <footer className="footer">
-          Powered by Copilot or Gemini | <a href="https://github.com/OwenNolis/Jira-Autofix">GitHub</a>
-        </footer>
       </div>
     </Router>
   );
