@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import './App.css';
 import About from './About';
+import Login from './Login';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('darkMode') === 'true';
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
   });
   const hasStarted = useRef(false);
 
@@ -47,44 +51,65 @@ function App() {
     setIsDarkMode((prevMode) => !prevMode);
   };
 
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem('isAuthenticated', 'true');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('isAuthenticated');
+  };
+
   return (
     <Router>
       <div className="App">
-        <nav>
-          <ul>
-            <li><Link to="/">Home</Link></li>
-            <li><Link to="/about">About</Link></li>
-          </ul>
-        </nav>
         <Routes>
+          <Route
+            path="/login"
+            element={<Login onLogin={handleLogin} />}
+          />
           <Route
             path="/"
             element={
-              <div className="card">
-                <h1>Jira Autofix</h1>
-                <p>Trigger an AI-powered fix for your Jira issues.</p>
-                <button 
-                  className="order-button" 
-                  onClick={handleRunAIFix}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Processing...' : 'Run AI Fix'}
-                </button>
-                {isLoading && <div className="spinner"></div>}
-                <div className="dark-mode-toggle">
-                  <label>
-                    <input 
-                      type="checkbox" 
-                      checked={isDarkMode} 
-                      onChange={toggleDarkMode} 
-                    />
-                    Enable Dark Mode
-                  </label>
+              isAuthenticated ? (
+                <div>
+                  <nav>
+                    <ul>
+                      <li><a href="/" onClick={(e) => e.preventDefault()}>Home</a></li>
+                      <li><a href="/about" onClick={(e) => e.preventDefault()}>About</a></li>
+                      <li><button onClick={handleLogout}>Logout</button></li>
+                    </ul>
+                  </nav>
+                  <div className="card">
+                    <h1>Jira Autofix</h1>
+                    <p>Trigger an AI-powered fix for your Jira issues.</p>
+                    <button 
+                      className="order-button" 
+                      onClick={handleRunAIFix}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Processing...' : 'Run AI Fix'}
+                    </button>
+                    {isLoading && <div className="spinner"></div>}
+                    <div className="dark-mode-toggle">
+                      <label>
+                        <input 
+                          type="checkbox" 
+                          checked={isDarkMode} 
+                          onChange={toggleDarkMode} 
+                        />
+                        Enable Dark Mode
+                      </label>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <Navigate to="/login" />
+              )
             }
           />
-          <Route path="/about" element={<About />} />
+          <Route path="/about" element={isAuthenticated ? <About /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </Router>
