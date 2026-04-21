@@ -1,8 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    document.title = 'Jira Autofix';
+    return () => {
+      document.title = 'Jira Autofix';
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) {
+      document.title = 'Processing... | Jira Autofix';
+    } else {
+      document.title = 'Fix Complete | Jira Autofix';
+    }
+  }, [isLoading]);
 
   const handleRunAIFix = () => {
     setIsLoading(true);
