@@ -30,7 +30,7 @@ function App() {
     setTimeout(() => {
       alert('AI Fix triggered!');
       setIsLoading(false);
-    }, 10000);
+    }, 2000);
   };
 
   return (
@@ -42,7 +42,6 @@ function App() {
           className="order-button" 
           onClick={handleRunAIFix}
           disabled={isLoading}
-          style={{ backgroundColor: 'red' }}
         >
           {isLoading ? 'Processing...' : 'Run AI Fix'}
         </button>
