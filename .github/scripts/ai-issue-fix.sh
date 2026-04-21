@@ -597,7 +597,27 @@ done
 if [ -z "$CHANGED_CONTENTS" ]; then
   log_info "No changed files to validate — skipping"
 else
-  printf '%s' "You are an expert software engineer doing a final review.
+  MAX_VALIDATE_ITERATIONS=3
+  VALIDATE_ITERATION=0
+
+  while [ "$VALIDATE_ITERATION" -lt "$MAX_VALIDATE_ITERATIONS" ]; do
+    VALIDATE_ITERATION=$((VALIDATE_ITERATION + 1))
+    log_info "Validation iteration ${VALIDATE_ITERATION}/${MAX_VALIDATE_ITERATIONS}..."
+
+    # Refresh changed file contents each iteration
+    CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+    CHANGED_CONTENTS=""
+    for f in $CHANGED_FILES; do
+      [ -f "$f" ] || continue
+      CHANGED_CONTENTS="${CHANGED_CONTENTS}
+### ${f}
+\`\`\`
+$(cat "$f")
+\`\`\`
+"
+    done
+
+    printf '%s' "You are an expert software engineer doing a final review.
 An AI implemented a fix for a GitHub issue. Your job is to check whether
 every requirement in the issue is actually satisfied by the implementation.
 
@@ -636,14 +656,14 @@ If there are gaps, return satisfied: false and include the fixes in changes:
   ]
 }" > /tmp/ai_validate_prompt.txt
 
-  HTTP_CODE=$(call_ai /tmp/ai_validate_prompt.txt /tmp/ai_validate_response.json)
-  log_info "Validation API status: ${HTTP_CODE}"
-  check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_validate_response.json
+    HTTP_CODE=$(call_ai /tmp/ai_validate_prompt.txt /tmp/ai_validate_response.json)
+    log_info "Validation API status: ${HTTP_CODE}"
+    check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_validate_response.json
 
-  # Parse validation response — write to file first to avoid pipe+heredoc conflict
-  extract_text /tmp/ai_validate_response.json > /tmp/ai_validation_text.txt
+    # Parse validation response — write to file first to avoid pipe+heredoc conflict
+    extract_text /tmp/ai_validate_response.json > /tmp/ai_validation_text.txt
 
-  SATISFIED=$(AI_PROVIDER_ENV="${AI_PROVIDER}" python3 << 'PYEOF'
+    SATISFIED=$(AI_PROVIDER_ENV="${AI_PROVIDER}" python3 << 'PYEOF'
 import json, sys, re, os
 
 with open('/tmp/ai_validation_text.txt') as f:
@@ -675,22 +695,56 @@ with open('/tmp/ai_validation.txt', 'w') as f:
         for g in gaps:
             f.write(f"- {g}\n")
 
-# Write changes to file if any gaps need fixing
 changes = data.get('changes', [])
 if not satisfied and changes:
-    with open('/tmp/ai_validate_changes.json', 'w') as f:
-        json.dump({'analysis': analysis, 'changes': changes}, f)
     print("NEEDS_FIX")
 else:
     print("OK")
 PYEOF
-  )
+    )
 
-  if echo "$SATISFIED" | grep -q "NEEDS_FIX"; then
-    log_warning "Requirements gaps found — applying fixes..."
-    apply_ai_response /tmp/ai_validate_response.json
-    log_success "Validation fixes applied"
-  else
-    log_success "All requirements satisfied — implementation is complete"
-  fi
+    if echo "$SATISFIED" | grep -q "NEEDS_FIX"; then
+      log_warning "Gaps found — applying fixes (iteration ${VALIDATE_ITERATION})..."
+      apply_ai_response /tmp/ai_validate_response.json
+
+      # Run type check again after validation fixes
+      if [ -n "$TSC_DIR" ]; then
+        log_info "Re-running type check after validation fixes..."
+        (cd "$TSC_DIR" && npm install --silent 2>/dev/null) || true
+        TSC_OUT=$((cd "$TSC_DIR" && npx tsc --noEmit 2>&1) || true)
+        if [ -n "$TSC_OUT" ]; then
+          log_warning "TypeScript errors after validation fix — healing..."
+          HEAL_CONTENTS=""
+          for f in $(git diff --name-only 2>/dev/null || true); do
+            [ -f "$f" ] || continue
+            HEAL_CONTENTS="${HEAL_CONTENTS}
+### ${f}
+\`\`\`
+$(cat "$f")
+\`\`\`
+"
+          done
+          printf '%s' "Fix these TypeScript errors without changing the intended behaviour.
+
+## Errors
+${TSC_OUT}
+
+## Current files
+${HEAL_CONTENTS}
+
+Return the same JSON structure with corrected files." > /tmp/ai_post_validate_heal_prompt.txt
+          HTTP_CODE=$(call_ai /tmp/ai_post_validate_heal_prompt.txt /tmp/ai_post_validate_heal_response.json)
+          check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_post_validate_heal_response.json
+          apply_ai_response /tmp/ai_post_validate_heal_response.json
+        fi
+      fi
+    else
+      log_success "All requirements satisfied after ${VALIDATE_ITERATION} iteration(s)"
+      break
+    fi
+
+    if [ "$VALIDATE_ITERATION" -ge "$MAX_VALIDATE_ITERATIONS" ]; then
+      log_warning "Max validation iterations (${MAX_VALIDATE_ITERATIONS}) reached — PR will be created with best effort result"
+    fi
+  done
 fi
