@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
+  const hasStarted = useRef(false);
 
   useEffect(() => {
     document.title = 'Jira Autofix';
@@ -12,6 +13,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasStarted.current) {
+      hasStarted.current = true;
+      return;
+    }
     if (isLoading) {
       document.title = 'Processing... | Jira Autofix';
     } else {
