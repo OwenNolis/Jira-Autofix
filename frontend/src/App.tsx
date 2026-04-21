@@ -30,7 +30,7 @@ function App() {
     setTimeout(() => {
       alert('AI Fix triggered!');
       setIsLoading(false);
-    }, 2000);
+    }, 10000);
   };
 
   return (
