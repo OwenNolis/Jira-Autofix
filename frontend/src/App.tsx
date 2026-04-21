@@ -13,8 +13,10 @@ function App() {
     return localStorage.getItem('isAuthenticated') === 'true';
   });
   const [warningVisible, setWarningVisible] = useState(false);
+  const [countdown, setCountdown] = useState(30);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetTimeout = () => {
     if (timeoutRef.current) {
@@ -23,22 +25,41 @@ function App() {
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current);
     }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
 
     setWarningVisible(false);
+    setCountdown(30);
 
     warningTimeoutRef.current = setTimeout(() => {
       setWarningVisible(true);
-    }, 90 * 1000); // Show warning after 90 seconds
+      startCountdown();
+    }, 90 * 1000); // Show warning exactly 30 seconds before logout
 
     timeoutRef.current = setTimeout(() => {
       handleLogout();
     }, 120 * 1000); // Logout after 120 seconds
   };
 
+  const startCountdown = () => {
+    let timeLeft = 30;
+    countdownIntervalRef.current = setInterval(() => {
+      timeLeft -= 1;
+      setCountdown(timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(countdownIntervalRef.current!);
+      }
+    }, 1000);
+  };
+
   useEffect(() => {
     const handleActivity = () => {
       if (warningVisible) {
         setWarningVisible(false);
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+        }
       }
       resetTimeout();
     };
@@ -56,6 +77,9 @@ function App() {
       }
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
       }
     };
   }, [warningVisible]);
@@ -93,6 +117,9 @@ function App() {
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current);
     }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
   };
 
   const RequireAuth = ({ children }: { children: React.ReactElement }) => {
@@ -107,59 +134,26 @@ function App() {
     <Router>
       <div className="App">
         {warningVisible && (
-          <div className="warning">You will be logged out in 30 seconds due to inactivity</div>
+          <div className="session-warning">
+            You will be logged out in <strong>{countdown}</strong> seconds due to inactivity.
+          </div>
         )}
+        <header className="App-header">
+          <button onClick={toggleDarkMode} className="dark-mode-toggle">
+            Toggle Dark Mode
+          </button>
+          <button onClick={handleRunAIFix} disabled={isLoading} className="order-button">
+            {isLoading ? <span className="spinner" /> : 'Run AI Fix'}
+          </button>
+        </header>
         <Routes>
-          <Route
-            path="/login"
-            element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
-          />
+          <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route
             path="/about"
             element={
               <RequireAuth>
                 <About />
               </RequireAuth>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? (
-                <div>
-                  <nav>
-                    <ul>
-                      <li><a href="/" onClick={(e) => e.preventDefault()}>Home</a></li>
-                      <li><a href="/about" onClick={(e) => e.preventDefault()}>About</a></li>
-                      <li><button onClick={handleLogout}>Logout</button></li>
-                    </ul>
-                  </nav>
-                  <div className="card">
-                    <h1>Jira Autofix</h1>
-                    <p>Trigger an AI-powered fix for your Jira issues.</p>
-                    <button 
-                      className="order-button" 
-                      onClick={handleRunAIFix}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Processing...' : 'Run AI Fix'}
-                    </button>
-                    {isLoading && <div className="spinner"></div>}
-                    <div className="dark-mode-toggle">
-                      <label>
-                        <input 
-                          type="checkbox" 
-                          checked={isDarkMode} 
-                          onChange={toggleDarkMode} 
-                        />
-                        Dark Mode
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Navigate to="/login" />
-              )
             }
           />
         </Routes>
