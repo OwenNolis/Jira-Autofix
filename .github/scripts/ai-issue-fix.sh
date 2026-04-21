@@ -577,3 +577,162 @@ Return this exact structure:
     log_warning "Max healing iterations (${MAX_HEAL_ITERATIONS}) reached — some errors may remain"
   fi
 done
+
+# ── 8. Requirements validation pass ───────────────────────────
+log_info "Step 3/3 — Validating implementation against requirements..."
+
+# Collect current state of all changed files
+CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+CHANGED_CONTENTS=""
+for f in $CHANGED_FILES; do
+  [ -f "$f" ] || continue
+  CHANGED_CONTENTS="${CHANGED_CONTENTS}
+### ${f}
+\`\`\`
+$(cat "$f")
+\`\`\`
+"
+done
+
+if [ -z "$CHANGED_CONTENTS" ]; then
+  log_info "No changed files to validate — skipping"
+else
+  printf '%s' "You are an expert software engineer doing a final review.
+An AI implemented a fix for a GitHub issue. Your job is to check whether
+every requirement in the issue is actually satisfied by the implementation.
+
+## Original Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+
+${ISSUE_BODY}
+
+## Current Implementation (all changed files)
+${CHANGED_CONTENTS}
+
+## Your task
+
+Go through each requirement in the issue one by one and check if it is
+fully implemented in the code above.
+
+Return ONLY a valid JSON object:
+{
+  \"satisfied\": true or false,
+  \"gaps\": [\"list of requirements that are missing or incorrectly implemented\"],
+  \"analysis\": \"Summary of what is correct and what is missing\",
+  \"changes\": []
+}
+
+If all requirements are satisfied, return satisfied: true and an empty changes array.
+If there are gaps, return satisfied: false and include the fixes in changes:
+{
+  \"satisfied\": false,
+  \"gaps\": [\"missing redirect to home after login\"],
+  \"analysis\": \"The login sets isAuthenticated but never navigates to home\",
+  \"changes\": [
+    {
+      \"file\": \"relative/path/to/file.ext\",
+      \"action\": \"modify\",
+      \"content\": \"complete corrected file content\"
+    }
+  ]
+}" > /tmp/ai_validate_prompt.txt
+
+  HTTP_CODE=$(call_ai /tmp/ai_validate_prompt.txt /tmp/ai_validate_response.json)
+  log_info "Validation API status: ${HTTP_CODE}"
+  check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_validate_response.json
+
+  # Parse validation response
+  VALIDATION_TEXT=$(extract_text /tmp/ai_validate_response.json)
+
+  SATISFIED=$(echo "$VALIDATION_TEXT" | python3 << 'PYEOF'
+import json, sys, re, os
+
+raw = sys.stdin.read().strip()
+clean = re.sub(r'^```(?:json)?\s*\n?', '', raw)
+clean = re.sub(r'\n?```\s*$', '', clean.strip())
+
+try:
+    data = json.loads(clean)
+except Exception:
+    match = re.search(r'\{[\s\S]+\}', clean)
+    data = json.loads(match.group()) if match else {}
+
+satisfied = data.get('satisfied', True)
+gaps      = data.get('gaps', [])
+analysis  = data.get('analysis', '')
+
+print(f"[INFO] Validation: {'PASSED' if satisfied else 'FAILED'}")
+if gaps:
+    for gap in gaps:
+        print(f"[WARNING] Gap: {gap}")
+
+# Save validation result for PR description
+with open('/tmp/ai_validation.txt', 'w') as f:
+    f.write(f"Validation: {'PASSED' if satisfied else 'FAILED'}\n")
+    if gaps:
+        f.write("Gaps found:\n")
+        for g in gaps:
+            f.write(f"- {g}\n")
+
+# Write changes to file if any gaps need fixing
+changes = data.get('changes', [])
+if not satisfied and changes:
+    with open('/tmp/ai_validate_changes.json', 'w') as f:
+        json.dump({'analysis': analysis, 'changes': changes}, f)
+    print("NEEDS_FIX")
+else:
+    print("OK")
+PYEOF
+  )
+
+  if echo "$SATISFIED" | grep -q "NEEDS_FIX"; then
+    log_warning "Requirements gaps found — applying fixes..."
+    # Write a mock response file in the same format apply_ai_response expects
+    AI_PROVIDER_ENV="${AI_PROVIDER}" RESPONSE_FILE=/tmp/ai_validate_response.json python3 << 'PYEOF'
+import json, sys, os, re
+
+provider      = os.environ.get("AI_PROVIDER_ENV", "github")
+response_file = os.environ.get("RESPONSE_FILE", "/tmp/ai_validate_response.json")
+
+with open(response_file) as f:
+    resp = json.load(f)
+
+if provider == "gemini":
+    raw_text = resp.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+else:
+    raw_text = resp.get('choices', [{}])[0].get('message', {}).get('content', '')
+
+clean = re.sub(r'^```(?:json)?\s*\n?', '', raw_text.strip())
+clean = re.sub(r'\n?```\s*$', '', clean.strip())
+
+try:
+    result = json.loads(clean)
+except Exception:
+    match = re.search(r'\{[\s\S]+\}', clean)
+    result = json.loads(match.group()) if match else {}
+
+changes = result.get('changes', [])
+if not changes:
+    sys.exit(0)
+
+applied = 0
+for change in changes:
+    path    = (change.get('file') or '').strip()
+    action  = change.get('action', 'modify')
+    content = change.get('content', '')
+    if not path or '..' in path or path.startswith('/') or path.startswith('~'):
+        continue
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print(f"[SUCCESS] {'Created' if action == 'create' else 'Fixed'}: {path}")
+    applied += 1
+
+print(f"[SUCCESS] Applied {applied} validation fix(es)")
+PYEOF
+    log_success "Validation fixes applied"
+  else
+    log_success "All requirements satisfied — implementation is complete"
+  fi
+fi
