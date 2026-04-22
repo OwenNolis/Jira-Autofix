@@ -1,41 +1,19 @@
-.login {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background-color: #f5f5f5;
+/* Updated Login.css */
+
+/* Centered card styling for login form */
+.login-card {
+  margin: 0 auto;
+  padding: 20px;
+  max-width: 400px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.login h1 {
-  margin-bottom: 20px;
-}
-
-.login form {
-  display: flex;
-  flex-direction: column;
-  width: 300px;
-}
-
-.login form div {
-  margin-bottom: 15px;
-}
-
-.login form label {
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-
-.login form input {
+/* Ensure login button matches input field width */
+.login-button {
+  width: 100%;
   padding: 10px;
-  font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.login form button {
-  padding: 10px;
-  font-size: 16px;
   background-color: #007bff;
   color: white;
   border: none;
@@ -43,13 +21,6 @@
   cursor: pointer;
 }
 
-.login form button:hover {
+.login-button:hover {
   background-color: #0056b3;
-}
-
-.login .error {
-  color: red;
-  font-size: 14px;
-  margin-top: -10px;
-  margin-bottom: 10px;
 }
