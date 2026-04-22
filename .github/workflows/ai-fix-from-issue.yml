@@ -102,23 +102,22 @@ jobs:
             | grep -E '\.(ts|tsx|js|jsx|css|scss|html|json)$' \
             | sort | head -100)
 
-          # Pre-read all relevant source files into a temp file so Copilot has
-          # full context and does not need to use its read tool (partial reads
-          # cause "No match found" edit-loop failures).
+          # Embed COMPLETE source file contents so AI has full context
           true > /tmp/file_contents.txt
           for file in $(git ls-files | grep -E '\.(ts|tsx|js|jsx|css|scss)$' | head -30); do
             [ -f "$file" ] || continue
-            printf '### %s\n```\n' "$file" >> /tmp/file_contents.txt
-            cat "$file"               >> /tmp/file_contents.txt
-            printf '\n```\n\n'        >> /tmp/file_contents.txt
+            printf '### FILE: %s\n```\n' "$file" >> /tmp/file_contents.txt
+            cat "$file"                          >> /tmp/file_contents.txt
+            printf '\n```\n\n'                   >> /tmp/file_contents.txt
           done
 
           FILE_CONTENTS=$(cat /tmp/file_contents.txt)
 
           {
-            echo "You are an expert software engineer fixing a GitHub issue."
+            echo "You are an expert software engineer. Your task is to write code changes that fix a Jira issue."
+            echo ""
             echo "Repository: ${{ github.repository }}"
-            echo "Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+            echo "Jira/GitHub Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
             echo ""
             echo "## Issue Description"
             echo "${ISSUE_BODY}"
@@ -126,26 +125,26 @@ jobs:
             echo "## Repository File Tree"
             printf '```\n%s\n```\n' "${FILE_TREE}"
             echo ""
-            echo "## Current File Contents"
-            echo "The COMPLETE content of every source file is provided below."
-            echo "Use this as your source of truth — do NOT use your read tool"
-            echo "as partial reads cause edit mismatches."
-            echo ""
+            echo "## Current Source Files (COMPLETE contents)"
             echo "${FILE_CONTENTS}"
             echo ""
             echo "## Your Task"
-            echo "Implement the changes required by the issue above."
-            echo "For each file you change, write the COMPLETE updated file content."
+            echo "Write the actual code changes needed to fix the issue described above."
+            echo "- Preserve ALL existing functionality — do not remove or break any existing features."
+            echo "- Only add or modify what is needed to implement the fix."
+            echo "- Follow the existing code style and naming conventions."
+            echo "- If you create a new component, also import and use it in the relevant parent file."
             echo ""
-            echo "## CRITICAL Rules"
-            echo "1. Use the file contents above — do NOT use the read tool."
-            echo "2. Preserve ALL existing state variables, functions, hooks, routes,"
-            echo "   imports, and UI elements. Only ADD what the issue asks for."
-            echo "3. Do NOT remove, rename, or reorganise any existing code."
-            echo "4. Do NOT run shell commands, tests, or builds — only write files."
-            echo "5. Follow the existing code style and naming conventions."
-            echo "6. If you create a new component, also import and use it in the"
-            echo "   relevant parent file."
+            echo "## REQUIRED OUTPUT FORMAT"
+            echo "Respond with ONLY a JSON object — no explanation, no markdown fences around the JSON itself:"
+            echo ""
+            echo '{"files": [{"path": "frontend/src/App.tsx", "content": "// full file content here"}, {"path": "frontend/src/App.css", "content": "/* full file content */"}]}'
+            echo ""
+            echo "Rules for the JSON:"
+            echo "- 'path': relative path from repo root (e.g. frontend/src/App.tsx)"
+            echo "- 'content': the COMPLETE updated file — not a diff, not a snippet, the whole file"
+            echo "- Only include files you actually changed"
+            echo "- Output nothing before or after the JSON object"
           } > copilot-prompt.txt
 
           echo "Prompt written ($(wc -l < copilot-prompt.txt) lines)"
@@ -164,15 +163,13 @@ jobs:
       - name: Add Copilot CLI to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Run Copilot fixes
+      - name: Run Copilot and capture output
         id: ai_fix
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           copilot -p "$(cat copilot-prompt.txt)" \
             --model gpt-4.1 \
-            --allow-tool=read \
-            --allow-tool=write \
             --no-ask-user \
             2>&1 | tee /tmp/copilot-output.log
 
@@ -181,8 +178,66 @@ jobs:
             exit 1
           fi
 
-          # Save output as the analysis for the PR body
-          grep -v '^$' /tmp/copilot-output.log | tail -20 > /tmp/ai_analysis.txt || true
+          echo "=== Raw Copilot output ==="
+          cat /tmp/copilot-output.log
+
+      - name: Apply AI-generated file changes
+        id: apply_changes
+        run: |
+          python3 - <<'PYEOF'
+          import json, re, os, sys
+
+          raw = open("/tmp/copilot-output.log").read()
+
+          # Try to extract JSON — look for the outermost {...} containing "files"
+          match = re.search(r'\{[\s\S]*"files"[\s\S]*\}', raw)
+          if not match:
+              print("No JSON file changes found in Copilot output.")
+              print("--- Copilot output ---")
+              print(raw[:2000])
+              sys.exit(0)
+
+          try:
+              data = json.loads(match.group(0))
+          except json.JSONDecodeError as e:
+              print(f"JSON parse error: {e}")
+              print("Trying to salvage partial JSON...")
+              # Attempt to find the last complete file entry
+              partial = match.group(0)
+              # Truncate at last complete entry
+              last = partial.rfind('},')
+              if last != -1:
+                  partial = partial[:last+1] + ']}'
+                  try:
+                      data = json.loads('{"files": [' + partial.split('"files": [', 1)[1])
+                  except Exception:
+                      print("Could not salvage JSON, skipping.")
+                      sys.exit(0)
+              else:
+                  sys.exit(0)
+
+          files = data.get("files", [])
+          if not files:
+              print("JSON parsed but no files listed.")
+              sys.exit(0)
+
+          written = []
+          for entry in files:
+              path = entry.get("path", "").strip()
+              content = entry.get("content", "")
+              if not path:
+                  continue
+              os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
+              with open(path, "w") as f:
+                  f.write(content)
+              written.append(path)
+              print(f"Wrote: {path}")
+
+          # Save summary for PR body
+          summary = "AI applied changes to: " + ", ".join(written) if written else "No files written."
+          open("/tmp/ai_analysis.txt", "w").write(summary)
+          print(f"\nTotal files written: {len(written)}")
+          PYEOF
 
       - name: Check for changes
         id: check_changes
