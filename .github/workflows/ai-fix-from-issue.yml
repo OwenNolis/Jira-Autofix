@@ -50,9 +50,6 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
 
-      - name: Make scripts executable
-        run: chmod +x .github/scripts/ai-issue-fix.sh
-
       - name: Resolve issue number and title
         id: resolve
         env:
@@ -84,16 +81,92 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
             -d '{"content":"eyes"}' > /dev/null
 
-      - name: Run AI fix analysis
-        id: ai_fix
+      - name: Build Copilot prompt from GitHub issue
+        id: build_prompt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          .github/scripts/ai-issue-fix.sh "${{ steps.resolve.outputs.number }}"
+          ISSUE_NUMBER="${{ steps.resolve.outputs.number }}"
+
+          # Fetch full issue details
+          ISSUE_JSON=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}")
+
+          ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title // "Untitled"')
+          ISSUE_BODY=$(echo "$ISSUE_JSON"  | jq -r '.body  // "No description."')
+
+          # Build repository file tree for context
+          FILE_TREE=$(git ls-files \
+            | grep -E '\.(ts|tsx|js|jsx|css|scss|html|json|yml|yaml)$' \
+            | sort | head -100)
+
+          {
+            echo "You are an expert software engineer fixing a GitHub issue."
+            echo "Repository: ${{ github.repository }}"
+            echo "Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+            echo ""
+            echo "## Issue Description"
+            echo "${ISSUE_BODY}"
+            echo ""
+            echo "## Repository File Tree"
+            echo '```'
+            echo "${FILE_TREE}"
+            echo '```'
+            echo ""
+            echo "## Your Task"
+            echo "Read the relevant files and implement the changes required by this issue."
+            echo "Make minimal, surgical changes — add what is needed without touching unrelated code."
+            echo ""
+            echo "## CRITICAL Rules — you must follow all of these"
+            echo "1. Read each relevant file before editing it."
+            echo "2. Preserve ALL existing state variables, functions, hooks, routes, imports,"
+            echo "   and UI elements that are already in the file."
+            echo "3. Only ADD or MODIFY what the issue specifically asks for."
+            echo "4. Do NOT remove, rename, reformat, or reorganise any existing code."
+            echo "5. Do NOT refactor or clean up code that is unrelated to the issue."
+            echo "6. Do NOT run shell commands, tests, or builds — only read and write files."
+            echo "7. Follow the existing code style and naming conventions in each file."
+            echo "8. If you create a new component file, also import and use it in the"
+            echo "   relevant parent file — do not leave it orphaned."
+          } > copilot-prompt.txt
+
+          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines)"
+
+      - name: Cache Copilot CLI
+        uses: actions/cache@v4
+        id: cache-copilot
+        with:
+          path: ~/.local/bin
+          key: copilot-cli-${{ runner.os }}
+
+      - name: Install Copilot CLI
+        if: steps.cache-copilot.outputs.cache-hit != 'true'
+        run: curl -fsSL https://gh.io/copilot-install | bash
+
+      - name: Add Copilot CLI to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run Copilot fixes
+        id: ai_fix
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          copilot -p "$(cat copilot-prompt.txt)" \
+            --model gpt-4.1 \
+            --allow-tool=read \
+            --allow-tool=write \
+            --no-ask-user \
+            2>&1 | tee /tmp/copilot-output.log
+
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+            echo "::error::Copilot CLI failed — check COPILOT_PAT secret and CLI flags"
+            exit 1
+          fi
+
+          # Save output as the analysis for the PR body
+          grep -v '^$' /tmp/copilot-output.log | tail -20 > /tmp/ai_analysis.txt || true
 
       - name: Check for changes
         id: check_changes
@@ -124,8 +197,7 @@ jobs:
           issue_num = os.environ["ISSUE_NUMBER"]
           jira_key = os.environ.get("JIRA_KEY", "")
           jira_domain = os.environ.get("JIRA_DOMAIN", "").rstrip("/")
-          ai_provider = os.environ.get("AI_PROVIDER", "github")
-          ai_label = "gpt-4o-mini via GitHub Models" if ai_provider != "gemini" else "Gemini"
+          ai_label = "GitHub Copilot (gpt-4.1)"
           analysis = open("/tmp/ai_analysis.txt").read() \
                      if os.path.exists("/tmp/ai_analysis.txt") else "AI-generated fix"
 
