@@ -34,6 +34,16 @@ function App() {
     return savedVisibility === 'true' || false; // Ensure default is false
   });
 
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
+
+  const handlePopupOpen = () => {
+    setIsPopupVisible(true);
+  };
+
+  const handlePopupClose = () => {
+    setIsPopupVisible(false);
+  };
+
   const handleRunAIFix = () => {
     setIsLoading(true);
     const newEntry: RunHistoryEntry = {
@@ -161,6 +171,7 @@ function App() {
         <nav className="navigation-bar">
           <ul>
             <li><Link to="/">Home</Link></li>
+            <li><button className="popup-button" onClick={handlePopupOpen}>Image Popup</button></li>
             <li><Link to="/about">About</Link></li>
             {isAuthenticated ? (
               <li><button onClick={handleLogout}>Logout</button></li>
@@ -169,6 +180,14 @@ function App() {
             )}
           </ul>
         </nav>
+        {isPopupVisible && (
+          <div className="popup-overlay" onClick={handlePopupClose}>
+            <div className="popup-content" onClick={(e) => e.stopPropagation()}>
+              <img src="/BLU.jpg" alt="Popup" className="popup-image" />
+              <button className="popup-close-button" onClick={handlePopupClose}>Close</button>
+            </div>
+          </div>
+        )}
         {warningVisible && (
           <div className="session-warning">
             You will be logged out in <strong>{countdown}</strong> seconds due to inactivity.
