@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } from 'react-router-dom';
 import './App.css';
 import About from './About';
 import Login from './Login';
@@ -64,7 +64,6 @@ function App() {
     localStorage.setItem('isHistoryVisible', newVisibility.toString());
   };
 
-  // ── Session timeout ──────────────────────────────────────────
   const startCountdown = () => {
     let timeLeft = 30;
     setCountdown(timeLeft);
@@ -95,7 +94,6 @@ function App() {
     }, 120 * 1000); // logout after 2 minutes
   };
 
-  // Activity listeners — use a ref so resetTimeout is always current
   const resetTimeoutRef = useRef(resetTimeout);
   useEffect(() => { resetTimeoutRef.current = resetTimeout; });
 
@@ -116,9 +114,8 @@ function App() {
       if (warningTimeoutRef.current)    clearTimeout(warningTimeoutRef.current);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
-  }, []); // run once on mount only — no warningVisible dependency
+  }, []);
 
-  // ── Tab title ────────────────────────────────────────────────
   useEffect(() => {
     document.title = 'Jira Autofix';
     return () => { document.title = 'Jira Autofix'; };
@@ -129,13 +126,10 @@ function App() {
     document.title = isLoading ? 'Processing... | Jira Autofix' : 'Fix Complete | Jira Autofix';
   }, [isLoading]);
 
-  // ── Dark mode ────────────────────────────────────────────────
   useEffect(() => {
     document.body.className = isDarkMode ? 'dark-mode' : '';
     localStorage.setItem('darkMode', isDarkMode.toString());
   }, [isDarkMode]);
-
-  // ── Handlers ─────────────────────────────────────────────────
 
   const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
@@ -153,7 +147,6 @@ function App() {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
   };
 
-  // ── Protected route helper ───────────────────────────────────
   const RequireAuth = ({ children }: { children: React.ReactElement }) => {
     const location = useLocation();
     if (!isAuthenticated) {
@@ -162,23 +155,24 @@ function App() {
     return children;
   };
 
-  // ── Render ───────────────────────────────────────────────────
   return (
     <Router>
       <div className="App">
+        <nav className="navigation-bar">
+          <ul>
+            <li><Link to="/">Home</Link></li>
+            <li><Link to="/about">About</Link></li>
+            {isAuthenticated ? (
+              <li><button onClick={handleLogout}>Logout</button></li>
+            ) : (
+              <li><Link to="/login">Login</Link></li>
+            )}
+          </ul>
+        </nav>
         {warningVisible && (
           <div className="session-warning">
             You will be logged out in <strong>{countdown}</strong> seconds due to inactivity.
           </div>
-        )}
-        {isAuthenticated && (
-          <nav>
-            <ul>
-              <li><a href="/">Home</a></li>
-              <li><a href="/about">About</a></li>
-              <li><button onClick={handleLogout}>Logout</button></li>
-            </ul>
-          </nav>
         )}
         <Routes>
           <Route
@@ -249,7 +243,10 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <Navigate to="/login" />
+                <div className="home-page">
+                  <h1>Welcome to Jira Autofix</h1>
+                  <p>Streamline your development process with AI-powered fixes.</p>
+                </div>
               )
             }
           />
