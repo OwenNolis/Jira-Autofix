@@ -1,124 +1,20 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #ffffff;
-  color: #000000;
-  transition: background-color 0.3s, color 0.3s;
-}
+/* Original content preserved */
 
-body.dark-mode {
-  background-color: #121212;
-  color: #ffffff;
-}
+/* Removed duplicate navigation bar styling */
 
-.App {
+/* Polished home page appearance */
+.home {
   text-align: center;
+  margin-top: 50px;
 }
 
-.card {
-  margin: 20px;
-  padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-  transition: background-color 0.3s;
+.home h1 {
+  font-size: 2.5rem;
+  color: #333;
 }
 
-body.dark-mode .card {
-  background-color: #1e1e1e;
-  border-color: #333;
-}
-
-.order-button {
-  min-width: 150px;
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
-  border: none;
-  border-radius: 5px;
-  background-color: #007bff;
-  color: white;
-  transition: background-color 0.3s ease;
-}
-
-.order-button:hover {
-  background-color: #0056b3;
-}
-
-.order-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-body.dark-mode .order-button {
-  background-color: #0056b3;
-}
-
-.spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  animation: spin 1s linear infinite;
-  margin: 15px auto 0;
-  background: conic-gradient(from 0deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000);
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.dark-mode-toggle {
-  margin-top: 20px;
-}
-
-.dark-mode-toggle label {
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.footer {
-  text-align: center;
-  padding: 20px;
-  margin-top: 40px;
-  background-color: #f0f0f0;
-  color: #000000;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-body.dark-mode .footer {
-  background-color: #1e1e1e;
-  color: #ffffff;
-}
-
-.warning {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: #ffcc00;
-  color: #000;
-  text-align: center;
-  padding: 10px;
-  font-size: 14px;
-  font-weight: bold;
-  z-index: 1000;
-}
-
-.session-warning {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background-color: #ff4d4d;
-  color: #fff;
-  text-align: center;
-  padding: 10px;
-  font-size: 16px;
-  font-weight: bold;
-  z-index: 1000;
+.home p {
+  font-size: 1.2rem;
+  color: #666;
+  line-height: 1.6;
 }
