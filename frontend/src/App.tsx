@@ -4,6 +4,19 @@ import './App.css';
 import About from './About';
 import Login from './Login';
 
+// Sun and Moon SVG icons
+const SunIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" fill="none"/>
+    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2"/>
+  </svg>
+);
+const MoonIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M21 12.79A9 9 0 0111.21 3c0 .34.02.68.05 1.01A7 7 0 1012 21a9 9 0 009-8.21z" stroke="currentColor" strokeWidth="2" fill="none"/>
+  </svg>
+);
+
 // New Map page component
 function Map() {
   return (
@@ -33,6 +46,16 @@ function AppContent() {
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Apply dark mode class to root div
+  useEffect(() => {
+    // This effect is for body-level styling if needed
+    if (isDarkMode) {
+      document.body.classList.add('dark');
+    } else {
+      document.body.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -66,31 +89,51 @@ function AppContent() {
     };
   }, []);
 
+  // Dark mode toggle handler
+  const handleToggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      localStorage.setItem('darkMode', String(!prev));
+      return !prev;
+    });
+  };
+
   return (
-    <div className="App">
+    <div className={`App${isDarkMode ? ' dark' : ''}`}>
       <nav className="navigation-bar">
         <ul className="nav-links">
           <li><Link to="/">Home</Link></li>
           <li><Link to="/about">About</Link></li>
           <li><Link to="/map">Map</Link></li>
         </ul>
-        {isAuthenticated && (
-          <div className="avatar-menu" ref={avatarMenuRef}>
-            <img
-              src="/Hessi.png"
-              alt="User Avatar"
-              className="avatar"
-              onClick={toggleAvatarMenu}
-            />
-            {/* Use local horn.mp3 instead of remote sound */}
-            <audio ref={audioRef} src="/horn.mp3" preload="auto" />
-            {isAvatarMenuOpen && (
-              <div className="dropdown-menu">
-                <button onClick={handleLogout}>Logout</button>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="nav-actions">
+          {/* Dark mode toggle button */}
+          <button
+            className="dark-mode-toggle"
+            onClick={handleToggleDarkMode}
+            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            type="button"
+          >
+            {isDarkMode ? <SunIcon /> : <MoonIcon />}
+          </button>
+          {isAuthenticated && (
+            <div className="avatar-menu" ref={avatarMenuRef}>
+              <img
+                src="/Hessi.png"
+                alt="User Avatar"
+                className="avatar"
+                onClick={toggleAvatarMenu}
+              />
+              {/* Use local horn.mp3 instead of remote sound */}
+              <audio ref={audioRef} src="/horn.mp3" preload="auto" />
+              {isAvatarMenuOpen && (
+                <div className="dropdown-menu">
+                  <button onClick={handleLogout}>Logout</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </nav>
       <Routes>
         <Route
