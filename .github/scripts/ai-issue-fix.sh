@@ -373,11 +373,15 @@ def extract_symbols(filepath):
     # Number of useEffect hooks (adding is fine, removing is not)
     effect_count = len(re.findall(r'useEffect\s*\(', content))
 
+    # Total line count — used to catch "kept signatures, gutted implementations"
+    line_count = len(content.splitlines())
+
     return {
         'state_vars':    state_vars,
         'func_names':    func_names,
         'route_paths':   route_paths,
         'effect_count':  effect_count,
+        'line_count':    line_count,
     }
 
 files = [f for f in sys.argv[1:] if os.path.isfile(f)]
@@ -620,6 +624,16 @@ for filepath, original in snapshots.items():
         missing.append(
             f"{original_effects - current_effects} useEffect hook(s)")
 
+    # Line count — catches "kept signatures, gutted implementations"
+    # Flag if the file lost more than 20% of its original lines
+    original_lines = original.get('line_count', 0)
+    current_lines  = len(content.splitlines())
+    if original_lines > 20 and current_lines < original_lines * 0.80:
+        missing.append(
+            f"lost {original_lines - current_lines} lines "
+            f"({current_lines}/{original_lines} remaining, "
+            f">{int((1 - current_lines/original_lines)*100)}% removed)")
+
     if missing:
         suspicious[filepath] = missing
 
@@ -636,11 +650,12 @@ try:
                 continue  # already handled above
             try:
                 a, r = int(added_s), int(removed_s)
-                if r > 30 and r > a * 1.5:
+                # Flag if net removal is significant (lost more than removed/2 lines)
+                if r > 20 and r > a:
                     if filename not in suspicious:
                         suspicious[filename] = []
                     suspicious[filename].append(
-                        f"line-count heuristic +{a}/-{r}")
+                        f"line-count fallback +{a}/-{r}")
             except ValueError:
                 pass
 except Exception:
