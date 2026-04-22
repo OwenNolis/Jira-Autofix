@@ -122,3 +122,46 @@ body.dark-mode .footer {
   font-weight: bold;
   z-index: 1000;
 }
+
+.navigation-bar {
+  width: 100%;
+  background-color: #007bff;
+  padding: 10px 0;
+}
+
+.navigation-bar ul {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
+
+.navigation-bar li {
+  margin: 0 15px;
+}
+
+.navigation-bar a {
+  text-decoration: none;
+  color: white;
+  font-weight: bold;
+}
+
+.navigation-bar a:hover {
+  text-decoration: underline;
+}
+
+.home-page {
+  text-align: center;
+  padding: 20px;
+}
+
+.home-page h1 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.home-page p {
+  font-size: 1.2rem;
+  color: #555;
+}
