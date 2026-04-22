@@ -31,6 +31,7 @@ function App() {
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -39,7 +40,15 @@ function App() {
     navigate('/login');
   };
 
+  const playHornSound = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play();
+    }
+  };
+
   const toggleAvatarMenu = () => {
+    playHornSound();
     setIsAvatarMenuOpen((prev) => !prev);
   };
 
@@ -68,11 +77,12 @@ function App() {
           {isAuthenticated && (
             <div className="avatar-menu" ref={avatarMenuRef}>
               <img
-                src="/path/to/user-avatar.png"
+                src="/Hessi.png"
                 alt="User Avatar"
                 className="avatar"
                 onClick={toggleAvatarMenu}
               />
+              <audio ref={audioRef} src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfae7b2.mp3" preload="auto" />
               {isAvatarMenuOpen && (
                 <div className="dropdown-menu">
                   <button onClick={handleLogout}>Logout</button>
