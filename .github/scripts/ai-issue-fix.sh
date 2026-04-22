@@ -335,6 +335,63 @@ done <<< "$FILE_TREE"
 FILE_COUNT=$(echo "$CONTEXT_FILES" | grep -c '^###' || echo 0)
 log_info "Context: ~${TOTAL_CHARS} chars across ${FILE_COUNT} files"
 
+# ── 4b. Feature snapshot — record critical symbols before AI runs ──
+# We snapshot every file the planner identified so we can verify nothing
+# gets silently removed after the AI applies its changes.
+log_info "Saving feature snapshots of targeted files..."
+
+cat > /tmp/save_snapshots.py << 'PYEOF'
+import re, json, sys, os
+
+def extract_symbols(filepath):
+    try:
+        content = open(filepath, encoding='utf-8', errors='ignore').read()
+    except Exception:
+        return {}
+
+    # State variables: const [foo, setFoo] = useState(...)
+    state_vars = re.findall(
+        r'const\s+\[(\w+),\s*set\w+\]\s*=\s*useState', content)
+
+    # Named arrow functions / regular functions (handlers, helpers)
+    func_names  = re.findall(r'const\s+(\w+)\s*=\s*(?:async\s*)?\(', content)
+    func_names += re.findall(r'function\s+(\w+)\s*\(', content)
+    # Skip PascalCase component names — those are components, not features
+    func_names  = [f for f in func_names if f and not f[0].isupper()]
+
+    # React Router route paths
+    route_paths = re.findall(r'path=["\']([^"\']+)["\']', content)
+
+    # Number of useEffect hooks (adding is fine, removing is not)
+    effect_count = len(re.findall(r'useEffect\s*\(', content))
+
+    return {
+        'state_vars':    state_vars,
+        'func_names':    func_names,
+        'route_paths':   route_paths,
+        'effect_count':  effect_count,
+    }
+
+files = [f for f in sys.argv[1:] if os.path.isfile(f)]
+snapshots = {}
+for f in files:
+    snapshots[f] = extract_symbols(f)
+    s = snapshots[f]
+    print(
+        f"[INFO] Snapshot: {f}  "
+        f"{len(s.get('state_vars',[]))} state vars  "
+        f"{len(s.get('func_names',[]))} funcs  "
+        f"{len(s.get('route_paths',[]))} routes  "
+        f"{s.get('effect_count',0)} effects",
+        file=sys.stderr
+    )
+
+with open('/tmp/feature_snapshots.json', 'w') as out:
+    json.dump(snapshots, out, indent=2)
+PYEOF
+
+python3 /tmp/save_snapshots.py $TARGETED_FILE_LIST
+
 # ── 5. STEP 2 — Implementation ────────────────────────────────
 log_info "Step 2/2 — Implementing the plan..."
 
@@ -490,109 +547,222 @@ PYEOF
 log_info "Parsing AI response and applying changes..."
 apply_ai_response /tmp/ai_response.json
 
-# ── 6b. Deletion safety check ──────────────────────────────────
-# If the AI deleted significantly more lines than it added in any file,
-# revert those files and retry with a stricter prompt.
+# ── 6b. Feature integrity check ────────────────────────────────
+# Verify that every critical symbol captured in the pre-flight snapshot
+# (state variables, handler functions, routes, useEffect hooks) still exists
+# in the modified files. This catches cases where the AI rewrites a file and
+# silently removes existing features even when the line counts look balanced.
+# Falls back to a raw line-count check for files that have no snapshot.
 MAX_DELETION_RETRIES=2
 DELETION_RETRY=0
 
 while [ "$DELETION_RETRY" -lt "$MAX_DELETION_RETRIES" ]; do
+
   git diff --numstat 2>/dev/null > /tmp/git_numstat.txt || true
-  python3 - << 'PYEOF' > /tmp/suspicious_files.txt 2>/dev/null || true
-import sys
-suspicious = []
+
+  cat > /tmp/check_integrity.py << 'PYEOF'
+import re, json, sys, os
+
+suspicious = {}   # filepath -> list[reason]
+
+# ── 1. Symbol-based check (pre-flight snapshot) ─────────────────
+try:
+    with open('/tmp/feature_snapshots.json') as f:
+        snapshots = json.load(f)
+except Exception:
+    snapshots = {}
+
+for filepath, original in snapshots.items():
+    if not os.path.isfile(filepath):
+        continue
+    try:
+        content = open(filepath, encoding='utf-8', errors='ignore').read()
+    except Exception:
+        continue
+
+    missing = []
+
+    # State variables
+    current_state = set(re.findall(
+        r'const\s+\[(\w+),\s*set\w+\]\s*=\s*useState', content))
+    for sv in original.get('state_vars', []):
+        if sv not in current_state:
+            missing.append(f"state variable '{sv}'")
+
+    # Named functions / handlers
+    current_funcs = set(re.findall(
+        r'const\s+(\w+)\s*=\s*(?:async\s*)?\(', content))
+    current_funcs |= set(re.findall(r'function\s+(\w+)\s*\(', content))
+    for fn in original.get('func_names', []):
+        if fn not in current_funcs:
+            missing.append(f"function '{fn}'")
+
+    # Route paths
+    current_routes = set(re.findall(r'path=["\']([^"\']+)["\']', content))
+    for route in original.get('route_paths', []):
+        if route not in current_routes:
+            missing.append(f"route '{route}'")
+
+    # useEffect hooks (adding more is fine, removing is not)
+    current_effects = len(re.findall(r'useEffect\s*\(', content))
+    original_effects = original.get('effect_count', 0)
+    if original_effects > 0 and current_effects < original_effects:
+        missing.append(
+            f"{original_effects - current_effects} useEffect hook(s)")
+
+    if missing:
+        suspicious[filepath] = missing
+
+# ── 2. Line-count fallback for files not in snapshot ───────────
+snapshotted = set(snapshots.keys())
 try:
     with open('/tmp/git_numstat.txt') as f:
         for line in f:
             parts = line.strip().split('\t')
             if len(parts) != 3:
                 continue
-            added, removed, filename = parts
+            added_s, removed_s, filename = parts
+            if filename in snapshotted:
+                continue  # already handled above
             try:
-                a, r = int(added), int(removed)
-                if r > 20 and r > a:
-                    suspicious.append(filename)
+                a, r = int(added_s), int(removed_s)
+                if r > 30 and r > a * 1.5:
+                    if filename not in suspicious:
+                        suspicious[filename] = []
+                    suspicious[filename].append(
+                        f"line-count heuristic +{a}/-{r}")
             except ValueError:
                 pass
 except Exception:
     pass
-sys.stdout.write('\n'.join(suspicious) + '\n')
-sys.stdout.flush()
+
+for filepath, reasons in suspicious.items():
+    print(f"SUSPICIOUS:{filepath}:{';'.join(reasons)}")
 PYEOF
-  SUSPICIOUS_FILES=$(cat /tmp/suspicious_files.txt 2>/dev/null | tr -d '\n' | xargs) || true
+
+  python3 /tmp/check_integrity.py > /tmp/integrity_results.txt 2>/dev/null || true
+
+  # Parse results
+  SUSPICIOUS_FILES=""
+  while IFS= read -r line; do
+    [[ "$line" == SUSPICIOUS:* ]] || continue
+    filepath=$(echo "$line" | cut -d: -f2)
+    reasons=$(echo  "$line" | cut -d: -f3-)
+    SUSPICIOUS_FILES="${SUSPICIOUS_FILES} ${filepath}"
+    echo "$reasons" > "/tmp/reasons_$(echo "$filepath" | tr '/' '_').txt"
+  done < /tmp/integrity_results.txt
+  SUSPICIOUS_FILES=$(echo "$SUSPICIOUS_FILES" | xargs)
 
   if [ -z "$SUSPICIOUS_FILES" ]; then
-    log_success "Deletion check passed — no suspicious removals"
+    log_success "Feature integrity check passed — all symbols intact"
     break
   fi
 
   DELETION_RETRY=$((DELETION_RETRY + 1))
-  log_warning "Suspicious deletions detected in: $(echo "$SUSPICIOUS_FILES" | tr '\n' ' ')"
-  log_warning "Deletion safety retry ${DELETION_RETRY}/${MAX_DELETION_RETRIES}..."
+  log_warning "Feature integrity issues: ${SUSPICIOUS_FILES}"
+  log_warning "Integrity retry ${DELETION_RETRY}/${MAX_DELETION_RETRIES}..."
 
-  # Build context: show original + current broken version for each suspicious file
+  # Capture newly created companion files BEFORE reverting anything
+  NEW_FILES=$(git ls-files --others --exclude-standard 2>/dev/null) || true
+  NEW_FILE_CONTENTS=""
+  if [ -n "$NEW_FILES" ]; then
+    log_info "Preserving companion files: $(echo "$NEW_FILES" | tr '\n' ' ')"
+    for nf in $NEW_FILES; do
+      [ -f "$nf" ] || continue
+      NEW_FILE_CONTENTS="${NEW_FILE_CONTENTS}
+### ${nf} (already created — import/use it, do NOT include in changes array)
+\`\`\`
+$(cat "$nf")
+\`\`\`
+"
+    done
+  fi
+
+  # Build context and revert each suspicious file
   ORIGINAL_CONTENTS=""
   BROKEN_CONTENTS=""
+  MISSING_SUMMARY=""
   for f in $SUSPICIOUS_FILES; do
-    # Restore original
     ORIGINAL=$(git show HEAD:"$f" 2>/dev/null || echo "")
     CURRENT=$(cat "$f" 2>/dev/null || echo "")
+    REASONS_FILE="/tmp/reasons_$(echo "$f" | tr '/' '_').txt"
+    REASONS=$(cat "$REASONS_FILE" 2>/dev/null || echo "unknown")
+
+    MISSING_SUMMARY="${MISSING_SUMMARY}
+- ${f}: ${REASONS}"
+
     ORIGINAL_CONTENTS="${ORIGINAL_CONTENTS}
-### ${f} (ORIGINAL — do not remove any of this)
+### ${f} (ORIGINAL — all existing code must be preserved)
 \`\`\`
 ${ORIGINAL}
 \`\`\`
 "
     BROKEN_CONTENTS="${BROKEN_CONTENTS}
-### ${f} (broken version produced by previous attempt — too much was deleted)
+### ${f} (broken version — reference only, shows what was wrongly removed)
 \`\`\`
 ${CURRENT}
 \`\`\`
 "
-    # Revert the file to original
     git checkout HEAD -- "$f" 2>/dev/null || true
-    log_info "Reverted ${f} to original"
+    log_info "Reverted ${f} — companion files kept on disk"
   done
 
-  printf '%s' "You are an expert software engineer. A previous attempt deleted too much existing code.
+  COMPANION_INSTRUCTION=""
+  if [ -n "$NEW_FILE_CONTENTS" ]; then
+    COMPANION_INSTRUCTION="
+## COMPANION FILES (already on disk — do NOT rewrite or include in changes)
+${NEW_FILE_CONTENTS}"
+  fi
+
+  printf '%s' "You are an expert software engineer. A previous AI attempt broke existing
+features by silently removing code that was still needed.
 
 ## Original Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
 
 ${ISSUE_BODY}
 
-## ORIGINAL FILES — preserve every line of these exactly
+## What was wrongly removed
+${MISSING_SUMMARY}
+${COMPANION_INSTRUCTION}
+
+## ORIGINAL FILE CONTENTS — every symbol listed above must remain
 ${ORIGINAL_CONTENTS}
 
-## BROKEN ATTEMPT — what went wrong (for reference only, do not use this)
+## BROKEN ATTEMPT (reference only — do NOT copy from this)
 ${BROKEN_CONTENTS}
 
-## STRICT Rules for this retry:
+## YOUR TASK
+Start from each ORIGINAL file and add the minimum code needed to implement
+the feature. Do not remove, rename, or reorganise any existing code.
+
+Rules:
 1. Return ONLY a valid JSON object — no markdown, no text outside the JSON.
-2. Start from the ORIGINAL file content and only ADD the new feature on top.
-3. Every existing function, route, hook, import, and JSX element must remain.
-4. Do NOT rewrite, reorganise, or remove ANY existing code.
-5. Only insert the minimum new lines required to implement the feature.
-6. Include the COMPLETE file content in your response.
+2. Keep EVERY existing state variable, function, hook, route, import, and
+   JSX element from the original files above.
+3. The new feature must be ADDED alongside the existing code, not replace it.
+4. If companion files already exist, only add their import/usage to the
+   original file. Do NOT include companion files in your changes array.
+5. Include the COMPLETE updated content for every file in changes.
 
 Return this exact structure:
 {
-  \"analysis\": \"What you added and where, without removing anything\",
+  \"analysis\": \"What you added and which existing symbols you explicitly preserved\",
   \"changes\": [
     {
       \"file\": \"relative/path/to/file.ext\",
       \"action\": \"modify\",
-      \"content\": \"complete file with original code preserved plus new feature added\"
+      \"content\": \"complete file with original code intact and new feature added\"
     }
   ]
-}" > /tmp/ai_deletion_retry_prompt.txt
+}" > /tmp/ai_integrity_retry_prompt.txt
 
-  HTTP_CODE=$(call_ai /tmp/ai_deletion_retry_prompt.txt /tmp/ai_deletion_retry_response.json)
-  log_info "Deletion retry API status: ${HTTP_CODE}"
-  check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_deletion_retry_response.json
-  apply_ai_response /tmp/ai_deletion_retry_response.json
+  HTTP_CODE=$(call_ai /tmp/ai_integrity_retry_prompt.txt /tmp/ai_integrity_retry_response.json)
+  log_info "Integrity retry API status: ${HTTP_CODE}"
+  check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_integrity_retry_response.json
+  apply_ai_response /tmp/ai_integrity_retry_response.json
 
   if [ "$DELETION_RETRY" -ge "$MAX_DELETION_RETRIES" ]; then
-    log_warning "Max deletion retries reached — proceeding with best effort result"
+    log_warning "Max integrity retries reached — proceeding with best effort result"
   fi
 done
 
