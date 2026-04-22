@@ -162,7 +162,7 @@ check_http "$HTTP_CODE" "${AI_PROVIDER}" /tmp/ai_plan_response.json
 PLAN_TEXT=$(extract_text /tmp/ai_plan_response.json)
 
 # Parse the plan to get targeted file list and plan text
-read -r TARGETED_FILE_LIST PLAN_SUMMARY <<< "$(echo "$PLAN_TEXT" | python3 << 'PYEOF'
+PLAN_SUMMARY=$(echo "$PLAN_TEXT" | python3 << 'PYEOF'
 import json, sys, re
 
 raw = sys.stdin.read().strip()
@@ -183,11 +183,19 @@ understanding = data.get('understanding', '')
 with open('/tmp/ai_plan.txt', 'w') as f:
     f.write(f"Understanding:\n{understanding}\n\nPlan:\n{plan}")
 
-# Print file list (space-separated) and summary on one line for bash read
-file_list = ' '.join(files)
-print(file_list + '\t' + plan.replace('\n', ' ')[:200])
+# Write file list to a separate file so all filenames are preserved
+# (bash `read` only puts the first word into VAR1 when splitting on spaces)
+with open('/tmp/ai_plan_files.txt', 'w') as ff:
+    ff.write('\n'.join(files))
+
+# Print only the plan summary on stdout
+print(plan.replace('\n', ' ')[:200])
 PYEOF
-)"
+)
+
+# Read ALL planned files from the file (not from TARGETED_FILE_LIST which only
+# captured the first filename due to bash `read` word-splitting on spaces).
+TARGETED_FILE_LIST=$(cat /tmp/ai_plan_files.txt 2>/dev/null | tr '\n' ' ' | xargs)
 
 log_info "Plan written to /tmp/ai_plan.txt"
 log_info "Files identified by planner: ${TARGETED_FILE_LIST:-none}"
@@ -762,7 +770,20 @@ Return this exact structure:
   apply_ai_response /tmp/ai_integrity_retry_response.json
 
   if [ "$DELETION_RETRY" -ge "$MAX_DELETION_RETRIES" ]; then
-    log_warning "Max integrity retries reached — proceeding with best effort result"
+    log_warning "Max integrity retries reached — running final safety revert..."
+    # Do one last check: any file that is STILL suspicious gets hard-reverted
+    # to HEAD so broken code is never committed, even if that means less of
+    # the new feature lands in this PR.
+    python3 /tmp/check_integrity.py > /tmp/integrity_final.txt 2>/dev/null || true
+    while IFS= read -r line; do
+      [[ "$line" == SUSPICIOUS:* ]] || continue
+      final_file=$(echo "$line" | cut -d: -f2)
+      # Only revert files that exist in HEAD (newly created files are kept)
+      if git show HEAD:"$final_file" &>/dev/null; then
+        git checkout HEAD -- "$final_file" 2>/dev/null || true
+        log_warning "Safety revert: ${final_file} restored to HEAD — feature was not safely addable"
+      fi
+    done < /tmp/integrity_final.txt
   fi
 done
 
