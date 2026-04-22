@@ -38,6 +38,7 @@
   cursor: pointer;
   border: 2px solid transparent;
   transition: border-color 0.3s;
+  object-fit: cover;
 }
 
 .avatar:hover {
