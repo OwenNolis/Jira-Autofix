@@ -187,13 +187,18 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
+          # Remove the prompt file so it never ends up in the PR
+          rm -f copilot-prompt.txt
+
           UNTRACKED=$(git ls-files --others --exclude-standard)
           if git diff --quiet && git diff --staged --quiet && [ -z "$UNTRACKED" ]; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
             echo "No file changes produced"
           else
             echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "=== Modified files ==="
             git diff --name-only
+            echo "=== Untracked files ==="
             echo "$UNTRACKED"
           fi
 

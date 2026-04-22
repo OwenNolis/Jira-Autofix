@@ -7,8 +7,9 @@ Thumbs.db
 .idea/
 *.swp
 
-# Runtime artifacts (produced by ai-issue-fix.sh locally)
+# Runtime artifacts
 /tmp/
+copilot-prompt.txt
 
 # Secrets (never commit these)
 *.env
