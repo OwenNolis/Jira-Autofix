@@ -4,6 +4,16 @@ import './App.css';
 import About from './About';
 import Login from './Login';
 
+// New Map page component
+function Map() {
+  return (
+    <div className="map-page">
+      <h1>Map</h1>
+      <p>This is the Map page. Here you can view the project map or related visualizations.</p>
+    </div>
+  );
+}
+
 type RunHistoryEntry = {
   timestamp: string;
   status: string;
@@ -50,9 +60,10 @@ function App() {
     <Router>
       <div className="App">
         <nav className="navigation-bar">
-          <ul>
+          <ul className="nav-links">
             <li><Link to="/">Home</Link></li>
             <li><Link to="/about">About</Link></li>
+            <li><Link to="/map">Map</Link></li>
           </ul>
           {isAuthenticated && (
             <div className="avatar-menu" ref={avatarMenuRef}>
@@ -80,6 +91,16 @@ function App() {
             element={
               isAuthenticated ? (
                 <About />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/map"
+            element={
+              isAuthenticated ? (
+                <Map />
               ) : (
                 <Navigate to="/login" />
               )

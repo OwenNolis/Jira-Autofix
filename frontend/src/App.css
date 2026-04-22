@@ -7,6 +7,26 @@
   background-color: #007bff;
 }
 
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-links li a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 18px;
+  transition: color 0.2s;
+}
+
+.nav-links li a:hover {
+  color: #ffd700;
+}
+
 .avatar-menu {
   position: relative;
 }
@@ -21,7 +41,7 @@
 }
 
 .avatar:hover {
-  border-color: #007bff;
+  border-color: #ffd700;
 }
 
 .avatar img {
@@ -53,4 +73,12 @@
 
 .dropdown-menu button:hover {
   background-color: #0056b3;
+}
+
+.home-page, .about, .map-page {
+  padding: 40px 20px;
+}
+
+.map-page h1 {
+  color: #007bff;
 }
