@@ -82,7 +82,8 @@ function AppContent() {
               className="avatar"
               onClick={toggleAvatarMenu}
             />
-            <audio ref={audioRef} src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfae7b2.mp3" preload="auto" />
+            {/* Use local horn.mp3 instead of remote sound */}
+            <audio ref={audioRef} src="/horn.mp3" preload="auto" />
             {isAvatarMenuOpen && (
               <div className="dropdown-menu">
                 <button onClick={handleLogout}>Logout</button>
