@@ -173,12 +173,10 @@ function App() {
             <li><Link to="/">Home</Link></li>
             <li><button className="popup-button" onClick={handlePopupOpen}>Image Popup</button></li>
             <li><Link to="/about">About</Link></li>
-            {isAuthenticated ? (
-              <li><button onClick={handleLogout}>Logout</button></li>
-            ) : (
-              <li><Link to="/login">Login</Link></li>
-            )}
           </ul>
+          {isAuthenticated && (
+            <button className="logout-button" onClick={handleLogout}>Logout</button>
+          )}
         </nav>
         {isPopupVisible && (
           <div className="popup-overlay" onClick={handlePopupClose}>

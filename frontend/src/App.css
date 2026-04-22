@@ -132,28 +132,60 @@ body.dark-mode .footer {
   width: 100%;
   background-color: #007bff;
   padding: 10px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .navigation-bar ul {
   list-style: none;
   display: flex;
-  justify-content: center;
   margin: 0;
   padding: 0;
 }
 
 .navigation-bar li {
   margin: 0 15px;
+  display: flex;
+  align-items: center; /* Ensures all items are vertically aligned */
 }
 
 .navigation-bar a {
   text-decoration: none;
   color: white;
   font-weight: bold;
+  position: relative;
+  display: inline-block;
+  padding: 10px 15px; /* Adjust padding to make the underline appear under the entire item */
 }
 
-.navigation-bar a:hover {
+.navigation-bar a:hover::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: black;
+}
+
+.logout-button {
+  position: fixed; /* Change from absolute to fixed */
+  top: 60px; /* Place under the navigation bar */
+  right: 20px;
+  background-color: #ff4d4d; /* Add a background color to make it visually distinct */
+  border: none;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 10px 15px;
+  border-radius: 5px;
+  z-index: 1000; /* Ensure it is not part of the navigation bar */
+}
+
+.logout-button:hover {
   text-decoration: underline;
+  background-color: #d43f3f; /* Add hover effect for better visibility */
 }
 
 .home-page {
