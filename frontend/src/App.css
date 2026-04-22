@@ -11,6 +11,13 @@
   --color-dropdown-bg: #fff;
   --color-dropdown-border: #ccc;
   --color-error: #d32f2f;
+  --color-table-header: #f0f4fa;
+  --color-table-border: #e0e0e0;
+  --color-status-success: #4caf50;
+  --color-status-failure: #e53935;
+  --color-status-inprogress: #ffb300;
+  --color-status-queued: #bdbdbd;
+  --color-spinner: #007bff;
 }
 
 .App {
@@ -34,6 +41,13 @@ body.dark {
   --color-dropdown-bg: #23272f;
   --color-dropdown-border: #444b5d;
   --color-error: #ff6b6b;
+  --color-table-header: #23272f;
+  --color-table-border: #444b5d;
+  --color-status-success: #4caf50;
+  --color-status-failure: #ff6b6b;
+  --color-status-inprogress: #ffd54f;
+  --color-status-queued: #888;
+  --color-spinner: #ffd700;
 }
 
 .navigation-bar {
@@ -183,4 +197,123 @@ body.dark {
 }
 .login .error {
   color: var(--color-error);
+}
+
+/* --- Pipeline Dashboard Styles --- */
+.pipeline-dashboard {
+  margin-top: 36px;
+  background: var(--color-card-bg);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 24px 16px 16px 16px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  transition: background 0.2s;
+}
+.pipeline-dashboard h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  color: var(--color-nav);
+}
+.refresh-btn {
+  float: right;
+  margin-top: -44px;
+  margin-bottom: 12px;
+  background: var(--color-button-bg);
+  color: var(--color-nav-link);
+  border: none;
+  border-radius: 4px;
+  padding: 7px 18px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  min-width: 90px;
+  position: relative;
+}
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.refresh-btn .spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-spinner);
+  border-top: 3px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.dashboard-error {
+  color: var(--color-error);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.dashboard-table-wrapper {
+  overflow-x: auto;
+}
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  background: var(--color-card-bg);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 1rem;
+}
+.dashboard-table th, .dashboard-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-table-border);
+}
+.dashboard-table th {
+  background: var(--color-table-header);
+  font-weight: 600;
+  color: var(--color-nav);
+}
+.dashboard-table tr:last-child td {
+  border-bottom: none;
+}
+.status-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.95em;
+  font-weight: 500;
+  color: #fff;
+  min-width: 70px;
+  text-align: center;
+}
+.status-badge-success {
+  background: var(--color-status-success);
+}
+.status-badge-failure {
+  background: var(--color-status-failure);
+}
+.status-badge-inprogress {
+  background: var(--color-status-inprogress);
+  color: #222;
+}
+.status-badge-queued {
+  background: var(--color-status-queued);
+  color: #222;
+}
+.no-issue, .no-pr {
+  color: #aaa;
+  font-style: italic;
+}
+@media (max-width: 600px) {
+  .dashboard-table th, .dashboard-table td {
+    padding: 7px 4px;
+    font-size: 0.95em;
+  }
+  .pipeline-dashboard {
+    padding: 12px 2px 8px 2px;
+  }
 }
