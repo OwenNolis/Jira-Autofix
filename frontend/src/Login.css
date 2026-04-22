@@ -1,55 +1,18 @@
-.login {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background-color: #f5f5f5;
-}
-
-.login h1 {
-  margin-bottom: 20px;
+.login-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .login form {
   display: flex;
   flex-direction: column;
-  width: 300px;
-}
-
-.login form div {
-  margin-bottom: 15px;
-}
-
-.login form label {
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-
-.login form input {
-  padding: 10px;
-  font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  align-items: center;
 }
 
 .login form button {
-  padding: 10px;
-  font-size: 16px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.login form button:hover {
-  background-color: #0056b3;
-}
-
-.login .error {
-  color: red;
-  font-size: 14px;
-  margin-top: -10px;
-  margin-bottom: 10px;
+  width: 100%;
 }
