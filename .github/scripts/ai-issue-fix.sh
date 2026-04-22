@@ -471,19 +471,19 @@ with open(response_file) as f:
 if provider == "gemini":
     candidates = resp.get('candidates') or []
     if not candidates:
-        print("[ERROR] No candidates in Gemini response", file=sys.stderr)
-        sys.exit(1)
+        print("[WARNING] No candidates in Gemini response — skipping apply", file=sys.stderr)
+        sys.exit(0)
     raw_text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
 else:
     choices = resp.get('choices') or []
     if not choices:
-        print("[ERROR] No choices in GitHub Models response", file=sys.stderr)
-        sys.exit(1)
+        print("[WARNING] No choices in GitHub Models response — skipping apply", file=sys.stderr)
+        sys.exit(0)
     raw_text = choices[0].get('message', {}).get('content', '')
 
 if not raw_text:
-    print("[ERROR] Empty response from AI", file=sys.stderr)
-    sys.exit(1)
+    print("[WARNING] Empty response from AI — skipping apply", file=sys.stderr)
+    sys.exit(0)
 
 clean = re.sub(r'^```(?:json)?\s*\n?', '', raw_text.strip())
 clean = re.sub(r'\n?```\s*$', '', clean.strip())
@@ -492,18 +492,20 @@ result = None
 try:
     result = json.loads(clean)
 except json.JSONDecodeError:
+    # Response may be truncated (max_tokens hit) — try to salvage a partial JSON object
     match = re.search(r'\{[\s\S]+\}', clean)
     if match:
         try:
             result = json.loads(match.group())
         except Exception as e:
-            print(f"[ERROR] Could not parse JSON from AI response: {e}", file=sys.stderr)
+            print(f"[WARNING] Could not parse JSON from AI response: {e}", file=sys.stderr)
             print(f"First 500 chars: {raw_text[:500]}", file=sys.stderr)
-            sys.exit(1)
+            print("[WARNING] Skipping apply — no changes made", file=sys.stderr)
+            sys.exit(0)   # graceful skip, do not crash the pipeline
     else:
-        print("[ERROR] No JSON object found in AI response", file=sys.stderr)
+        print("[WARNING] No JSON object found in AI response — skipping apply", file=sys.stderr)
         print(f"First 500 chars: {raw_text[:500]}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(0)   # graceful skip, do not crash the pipeline
 
 analysis = result.get('analysis', 'AI-generated code changes')
 changes  = result.get('changes', [])
