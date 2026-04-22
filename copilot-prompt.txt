@@ -1,0 +1,448 @@
+You are an expert software engineer fixing a GitHub issue.
+Repository: OwenNolis/Jira-Autofix
+Issue #67: [JIRAFIX-34] Make interactable nav bar
+
+## Issue Description
+<!-- jira-key: JIRAFIX-34 -->
+## Jira: [JIRAFIX-34](https://agentic-ai-sdlc.atlassian.net//browse/JIRAFIX-34)
+
+| Field | Value |
+|-------|-------|
+| **Type** | Task |
+| **Priority** | Medium |
+| **Status** | Closed |
+
+## Description
+
+add home, about, map
+
+---
+*Auto-created from Jira. Add label `ai-fix` or comment `!fix` to trigger AI-powered code changes.*
+
+## Repository File Tree
+```
+frontend/package-lock.json
+frontend/package.json
+frontend/public/index.html
+frontend/public/manifest.json
+frontend/src/About.tsx
+frontend/src/App.css
+frontend/src/App.test.tsx
+frontend/src/App.tsx
+frontend/src/Login.css
+frontend/src/Login.tsx
+frontend/src/index.css
+frontend/src/index.tsx
+frontend/src/react-app-env.d.ts
+frontend/src/reportWebVitals.ts
+frontend/src/setupTests.ts
+frontend/tsconfig.json
+```
+
+## Current File Contents
+The COMPLETE content of every source file is provided below.
+Use this as your source of truth — do NOT use your read tool
+as partial reads cause edit mismatches.
+
+### frontend/src/About.tsx
+```
+import React from 'react';
+
+function About() {
+  return (
+    <div className="about">
+      <h1>About</h1>
+      <p>This is the About page for the Jira Autofix application. Here you can find information about the app and its features.</p>
+    </div>
+  );
+}
+
+export default About;
+
+```
+
+### frontend/src/App.css
+```
+/* Add styles to position the avatar icon in the top right of the navigation bar */
+.navigation-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: #007bff;
+}
+
+.avatar-menu {
+  position: relative;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+}
+
+.avatar:hover {
+  border-color: #007bff;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  z-index: 1000;
+}
+
+.dropdown-menu button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dropdown-menu button:hover {
+  background-color: #0056b3;
+}
+```
+
+### frontend/src/App.test.tsx
+```
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import App from './App';
+
+test('renders learn react link', () => {
+  render(<App />);
+  const linkElement = screen.getByText(/learn react/i);
+  expect(linkElement).toBeInTheDocument();
+});
+
+```
+
+### frontend/src/App.tsx
+```
+import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link, useNavigate } from 'react-router-dom';
+import './App.css';
+import About from './About';
+import Login from './Login';
+
+type RunHistoryEntry = {
+  timestamp: string;
+  status: string;
+};
+
+function App() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('darkMode') === 'true';
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
+  });
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+
+  const avatarMenuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('isAuthenticated');
+    alert('You have been logged out.');
+    navigate('/login');
+  };
+
+  const toggleAvatarMenu = () => {
+    setIsAvatarMenuOpen((prev) => !prev);
+  };
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target as Node)) {
+      setIsAvatarMenuOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  return (
+    <Router>
+      <div className="App">
+        <nav className="navigation-bar">
+          <ul>
+            <li><Link to="/">Home</Link></li>
+            <li><Link to="/about">About</Link></li>
+          </ul>
+          {isAuthenticated && (
+            <div className="avatar-menu" ref={avatarMenuRef}>
+              <img
+                src="/path/to/user-avatar.png"
+                alt="User Avatar"
+                className="avatar"
+                onClick={toggleAvatarMenu}
+              />
+              {isAvatarMenuOpen && (
+                <div className="dropdown-menu">
+                  <button onClick={handleLogout}>Logout</button>
+                </div>
+              )}
+            </div>
+          )}
+        </nav>
+        <Routes>
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={() => setIsAuthenticated(true)} />}
+          />
+          <Route
+            path="/about"
+            element={
+              isAuthenticated ? (
+                <About />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <div className="home-page">
+                  <h1>Welcome to Jira Autofix</h1>
+                  <p>Streamline your development process with AI-powered fixes.</p>
+                </div>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+        </Routes>
+      </div>
+    </Router>
+  );
+}
+
+export default App;
+```
+
+### frontend/src/Login.css
+```
+.login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.login h1 {
+  margin-bottom: 20px;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+}
+
+.login form div {
+  margin-bottom: 15px;
+}
+
+.login form label {
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.login form input {
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.login form button {
+  padding: 10px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.login form button:hover {
+  background-color: #0056b3;
+}
+
+.login .error {
+  color: red;
+  font-size: 14px;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+```
+
+### frontend/src/Login.tsx
+```
+import React, { useState } from 'react';
+import './Login.css';
+
+const hardcodedUsername = 'admin';
+const hardcodedPassword = 'password';
+
+function Login({ onLogin }: { onLogin: () => void }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username === hardcodedUsername && password === hardcodedPassword) {
+      onLogin();
+    } else {
+      setError('Invalid username or password');
+    }
+  };
+
+  return (
+    <div className="login">
+      <h1>Login</h1>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="username">Username:</label>
+          <input
+            type="text"
+            id="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="password">Password:</label>
+          <input
+            type="password"
+            id="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        {error && <p className="error">{error}</p>}
+        <button type="submit">Login</button>
+      </form>
+    </div>
+  );
+}
+
+export default Login;
+```
+
+### frontend/src/index.css
+```
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+```
+
+### frontend/src/index.tsx
+```
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import App from './App';
+
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+```
+
+### frontend/src/react-app-env.d.ts
+```
+/// <reference types="react-scripts" />
+
+declare module '*.css';
+
+```
+
+### frontend/src/reportWebVitals.ts
+```
+import { ReportHandler } from 'web-vitals';
+
+const reportWebVitals = (onPerfEntry?: ReportHandler) => {
+  if (onPerfEntry && onPerfEntry instanceof Function) {
+    import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+      getCLS(onPerfEntry);
+      getFID(onPerfEntry);
+      getFCP(onPerfEntry);
+      getLCP(onPerfEntry);
+      getTTFB(onPerfEntry);
+    });
+  }
+};
+
+export default reportWebVitals;
+
+```
+
+### frontend/src/setupTests.ts
+```
+// jest-dom adds custom jest matchers for asserting on DOM nodes.
+// allows you to do things like:
+// expect(element).toHaveTextContent(/react/i)
+// learn more: https://github.com/testing-library/jest-dom
+import '@testing-library/jest-dom';
+
+```
+
+## Your Task
+Implement the changes required by the issue above.
+For each file you change, write the COMPLETE updated file content.
+
+## CRITICAL Rules
+1. Use the file contents above — do NOT use the read tool.
+2. Preserve ALL existing state variables, functions, hooks, routes,
+   imports, and UI elements. Only ADD what the issue asks for.
+3. Do NOT remove, rename, or reorganise any existing code.
+4. Do NOT run shell commands, tests, or builds — only write files.
+5. Follow the existing code style and naming conventions.
+6. If you create a new component, also import and use it in the
+   relevant parent file.
