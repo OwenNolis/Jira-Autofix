@@ -6,6 +6,7 @@ import Login from './Login';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
 import ReactDOM from 'react-dom';
+import Profile from './Profile';
 
 // Sun and Moon SVG icons
 const SunIcon = () => (
@@ -526,6 +527,7 @@ function AppContent() {
           <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
           <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
           <li><Link to="/issues" className={isActive('/issues') ? 'active' : ''}>Issues</Link></li>
+          <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link></li>
         </ul>
         <div className="nav-actions">
           {/* Dark mode toggle button */}
@@ -573,6 +575,10 @@ function AppContent() {
         <Route
           path="/issues"
           element={isAuthenticated ? <IssuesPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/profile"
+          element={isAuthenticated ? <Profile /> : <Navigate to="/login" />}
         />
         <Route
           path="/"
