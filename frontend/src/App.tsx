@@ -316,6 +316,139 @@ function PipelineRunDashboard() {
   );
 }
 
+// --- Jira Issues Page ---
+
+type JiraIssue = {
+  id: string;
+  key: string;
+  fields: {
+    summary: string;
+    status: { name: string };
+    priority: { name: string };
+    issuetype: { name: string };
+    created: string;
+    updated: string;
+  };
+};
+
+function getJiraStatusBadge(status: string) {
+  let colorClass = 'jira-status-badge-default';
+  if (/to do/i.test(status)) colorClass = 'jira-status-badge-todo';
+  else if (/in progress/i.test(status)) colorClass = 'jira-status-badge-inprogress';
+  else if (/done|closed|resolved/i.test(status)) colorClass = 'jira-status-badge-done';
+  return <span className={`jira-status-badge ${colorClass}`}>{status}</span>;
+}
+
+function getJiraPriorityBadge(priority: string) {
+  let colorClass = 'jira-priority-badge-default';
+  if (/high/i.test(priority)) colorClass = 'jira-priority-badge-high';
+  else if (/medium/i.test(priority)) colorClass = 'jira-priority-badge-medium';
+  else if (/low/i.test(priority)) colorClass = 'jira-priority-badge-low';
+  return <span className={`jira-priority-badge ${colorClass}`}>{priority}</span>;
+}
+
+function getJiraTypeBadge(type: string) {
+  let colorClass = 'jira-type-badge-default';
+  if (/bug/i.test(type)) colorClass = 'jira-type-badge-bug';
+  else if (/task/i.test(type)) colorClass = 'jira-type-badge-task';
+  else if (/story/i.test(type)) colorClass = 'jira-type-badge-story';
+  return <span className={`jira-type-badge ${colorClass}`}>{type}</span>;
+}
+
+function getJiraRelativeTime(isoDate: string): string {
+  const now = new Date();
+  const then = new Date(isoDate);
+  const diff = Math.floor((now.getTime() - then.getTime()) / 1000);
+  if (diff < 60) return `${diff} seconds ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  return `${Math.floor(diff / 86400)} days ago`;
+}
+
+function IssuesPage() {
+  const [issues, setIssues] = useState<JiraIssue[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+
+  const fetchIssues = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Public read-only endpoint for demo: Atlassian exposes a test project for API samples
+      // But for this project, we use the real Jira-Autofix project (replace with your own API endpoint if needed)
+      // This endpoint is CORS-protected, so in real use, a backend proxy is needed. For demo, we try direct fetch.
+      const resp = await fetch('https://agentic-ai-sdlc.atlassian.net/rest/api/3/search?jql=project=JIRAFIX&maxResults=20', {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      if (!resp.ok) throw new Error(`Jira API error: ${resp.status}`);
+      const data = await resp.json();
+      setIssues(data.issues || []);
+      setLastUpdated(Date.now());
+    } catch (e: any) {
+      setError(e.message || 'Failed to fetch Jira issues');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIssues();
+    // eslint-disable-next-line
+  }, []);
+
+  // Update relative times every 30s
+  useEffect(() => {
+    const interval = setInterval(() => setLastUpdated(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="issues-page">
+      <h1>Jira Issues (Jira-Autofix)</h1>
+      <button className="refresh-btn" onClick={fetchIssues} disabled={loading} aria-label="Refresh issues list">
+        {loading ? <span className="spinner" aria-label="Loading" /> : 'Refresh'}
+      </button>
+      {error && <div className="dashboard-error">{error}</div>}
+      <div className="issues-table-wrapper">
+        <table className="issues-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Summary</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Type</th>
+              <th>Created</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {issues.length === 0 && !loading && !error && (
+              <tr><td colSpan={7} style={{ textAlign: 'center' }}>No issues found.</td></tr>
+            )}
+            {issues.map((issue) => (
+              <tr key={issue.id}>
+                <td>
+                  <a href={`https://agentic-ai-sdlc.atlassian.net/browse/${issue.key}`} target="_blank" rel="noopener noreferrer">{issue.key}</a>
+                </td>
+                <td>{issue.fields.summary}</td>
+                <td>{getJiraStatusBadge(issue.fields.status.name)}</td>
+                <td>{getJiraPriorityBadge(issue.fields.priority.name)}</td>
+                <td>{getJiraTypeBadge(issue.fields.issuetype.name)}</td>
+                <td>{getJiraRelativeTime(issue.fields.created)}</td>
+                <td>{getJiraRelativeTime(issue.fields.updated)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // Inner component — rendered inside <Router> so useNavigate is valid here
 function AppContent() {
   const [isLoading, setIsLoading] = useState(false);
@@ -392,6 +525,7 @@ function AppContent() {
           <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
           <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
           <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
+          <li><Link to="/issues" className={isActive('/issues') ? 'active' : ''}>Issues</Link></li>
         </ul>
         <div className="nav-actions">
           {/* Dark mode toggle button */}
@@ -435,6 +569,10 @@ function AppContent() {
         <Route
           path="/map"
           element={isAuthenticated ? <EssersMap /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/issues"
+          element={isAuthenticated ? <IssuesPage /> : <Navigate to="/login" />}
         />
         <Route
           path="/"

@@ -18,6 +18,15 @@
   --color-status-inprogress: #ffb300;
   --color-status-queued: #bdbdbd;
   --color-spinner: #007bff;
+  --color-jira-status-todo: #bdbdbd;
+  --color-jira-status-inprogress: #ffb300;
+  --color-jira-status-done: #4caf50;
+  --color-jira-priority-high: #e53935;
+  --color-jira-priority-medium: #ffb300;
+  --color-jira-priority-low: #4caf50;
+  --color-jira-type-bug: #e53935;
+  --color-jira-type-task: #007bff;
+  --color-jira-type-story: #4caf50;
 }
 
 .App {
@@ -48,6 +57,15 @@ body.dark {
   --color-status-inprogress: #ffd54f;
   --color-status-queued: #888;
   --color-spinner: #ffd700;
+  --color-jira-status-todo: #888;
+  --color-jira-status-inprogress: #ffd54f;
+  --color-jira-status-done: #4caf50;
+  --color-jira-priority-high: #ff6b6b;
+  --color-jira-priority-medium: #ffd54f;
+  --color-jira-priority-low: #4caf50;
+  --color-jira-type-bug: #ff6b6b;
+  --color-jira-type-task: #90caf9;
+  --color-jira-type-story: #4caf50;
 }
 
 /* --- UI Cleanliness & Professionalism Enhancements --- */
@@ -498,6 +516,138 @@ body.dark ::-webkit-scrollbar-thumb, .App.dark ::-webkit-scrollbar-thumb {
   }
   .home-page, .about, .map-page {
     padding: 18px 4px 12px 4px;
+  }
+}
+
+/* --- Jira Issues Page Styles --- */
+.issues-page {
+  background: var(--color-card-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  margin: 32px auto;
+  max-width: 900px;
+  padding: 40px 20px;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.issues-page h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-nav);
+  margin-bottom: 0.5em;
+  letter-spacing: -1px;
+}
+.issues-table-wrapper {
+  overflow-x: auto;
+}
+.issues-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  background: var(--color-card-bg);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.issues-table th, .issues-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-table-border);
+}
+.issues-table th {
+  background: var(--color-table-header);
+  font-weight: 700;
+  color: var(--color-nav);
+  letter-spacing: 0.5px;
+}
+.issues-table tr:last-child td {
+  border-bottom: none;
+}
+.jira-status-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #fff;
+  min-width: 70px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.jira-status-badge-todo {
+  background: var(--color-jira-status-todo);
+  color: #222;
+}
+.jira-status-badge-inprogress {
+  background: var(--color-jira-status-inprogress);
+  color: #222;
+}
+.jira-status-badge-done {
+  background: var(--color-jira-status-done);
+}
+.jira-status-badge-default {
+  background: #bdbdbd;
+  color: #222;
+}
+.jira-priority-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #fff;
+  min-width: 70px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.jira-priority-badge-high {
+  background: var(--color-jira-priority-high);
+}
+.jira-priority-badge-medium {
+  background: var(--color-jira-priority-medium);
+  color: #222;
+}
+.jira-priority-badge-low {
+  background: var(--color-jira-priority-low);
+}
+.jira-priority-badge-default {
+  background: #bdbdbd;
+  color: #222;
+}
+.jira-type-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #fff;
+  min-width: 70px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.jira-type-badge-bug {
+  background: var(--color-jira-type-bug);
+}
+.jira-type-badge-task {
+  background: var(--color-jira-type-task);
+}
+.jira-type-badge-story {
+  background: var(--color-jira-type-story);
+}
+.jira-type-badge-default {
+  background: #bdbdbd;
+  color: #222;
+}
+@media (max-width: 600px) {
+  .issues-table th, .issues-table td {
+    padding: 7px 4px;
+    font-size: 0.95em;
+  }
+  .issues-page {
+    padding: 12px 2px 8px 2px;
   }
 }
 
