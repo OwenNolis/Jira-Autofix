@@ -375,10 +375,8 @@ function IssuesPage() {
     setLoading(true);
     setError(null);
     try {
-      // Public read-only endpoint for demo: Atlassian exposes a test project for API samples
-      // But for this project, we use the real Jira-Autofix project (replace with your own API endpoint if needed)
-      // This endpoint is CORS-protected, so in real use, a backend proxy is needed. For demo, we try direct fetch.
-      const resp = await fetch('https://agentic-ai-sdlc.atlassian.net/rest/api/3/search?jql=project=JIRAFIX&maxResults=20', {
+      // Use backend proxy to avoid CORS issues
+      const resp = await fetch('/api/jira/issues', {
         headers: {
           'Accept': 'application/json',
         },
