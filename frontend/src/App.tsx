@@ -319,16 +319,12 @@ function PipelineRunDashboard() {
 // --- Jira Issues Page ---
 
 type JiraIssue = {
-  id: string;
   key: string;
-  fields: {
-    summary: string;
-    status: { name: string };
-    priority: { name: string };
-    issuetype: { name: string };
-    created: string;
-    updated: string;
-  };
+  summary: string;
+  status: string;
+  priority: string;
+  type: string;
+  url: string;
 };
 
 function getJiraStatusBadge(status: string) {
