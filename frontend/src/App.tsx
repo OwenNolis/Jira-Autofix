@@ -153,6 +153,27 @@ function EssersMap() {
 
 // --- Pipeline Run Dashboard ---
 
+const PIPELINE_OPTIONS = [
+  {
+    key: 'ai-fix-from-issue',
+    label: 'AI Fix from Jira Issue',
+    workflowFile: 'ai-fix-from-issue.yml',
+    description: 'Runs triggered by Jira → GitHub Issue → AI Fix',
+  },
+  {
+    key: 'jira-to-github-issue',
+    label: 'Jira → GitHub Issue',
+    workflowFile: 'jira-to-github-issue.yml',
+    description: 'Runs triggered by syncing Jira issues to GitHub',
+  },
+  {
+    key: 'close-jira-on-pr-merge',
+    label: 'Close Jira on PR Merge',
+    workflowFile: 'close-jira-on-pr-merge.yml',
+    description: 'Runs triggered by closing Jira issues when PRs are merged',
+  },
+];
+
 type PipelineRun = {
   id: number;
   status: string;
@@ -222,6 +243,7 @@ function extractIssueNumber(branch: string): string | null {
 }
 
 function PipelineRunDashboard() {
+  const [selectedPipeline, setSelectedPipeline] = useState(PIPELINE_OPTIONS[0].key);
   const [runs, setRuns] = useState<PipelineRun[]>([]);
   const [prInfos, setPrInfos] = useState<{ [runId: number]: PRInfo }>({});
   const [loading, setLoading] = useState(false);
@@ -229,11 +251,12 @@ function PipelineRunDashboard() {
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
 
   // Fetch runs
-  const fetchRuns = async () => {
+  const fetchRuns = async (pipelineKey = selectedPipeline) => {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch('https://api.github.com/repos/OwenNolis/Jira-Autofix/actions/workflows/ai-fix-from-issue.yml/runs?per_page=10');
+      const pipeline = PIPELINE_OPTIONS.find(p => p.key === pipelineKey) || PIPELINE_OPTIONS[0];
+      const resp = await fetch(`https://api.github.com/repos/OwenNolis/Jira-Autofix/actions/workflows/${pipeline.workflowFile}/runs?per_page=10`);
       if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
       const data = await resp.json();
       const runs: PipelineRun[] = data.workflow_runs.map((run: any) => ({
@@ -261,9 +284,9 @@ function PipelineRunDashboard() {
   };
 
   useEffect(() => {
-    fetchRuns();
+    fetchRuns(selectedPipeline);
     // eslint-disable-next-line
-  }, []);
+  }, [selectedPipeline]);
 
   // Update relative times every 30s
   useEffect(() => {
@@ -271,19 +294,42 @@ function PipelineRunDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const handlePipelineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedPipeline(e.target.value);
+  };
+
+  const pipeline = PIPELINE_OPTIONS.find(p => p.key === selectedPipeline) || PIPELINE_OPTIONS[0];
+
   return (
     <div className="pipeline-dashboard">
-      <h2>Recent AI Fix Runs</h2>
-      <button className="refresh-btn" onClick={fetchRuns} disabled={loading} aria-label="Refresh run history">
-        {loading ? <span className="spinner" aria-label="Loading" /> : 'Refresh'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <h2 style={{ marginBottom: 0 }}>Recent Runs</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label htmlFor="pipeline-select" style={{ fontWeight: 500, marginRight: 6 }}>Action:</label>
+          <select
+            id="pipeline-select"
+            value={selectedPipeline}
+            onChange={handlePipelineChange}
+            style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid var(--color-dropdown-border)', background: 'var(--color-dropdown-bg)', fontWeight: 500, fontSize: '1rem' }}
+            aria-label="Select pipeline action"
+          >
+            {PIPELINE_OPTIONS.map(opt => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
+            ))}
+          </select>
+          <button className="refresh-btn" onClick={() => fetchRuns(selectedPipeline)} disabled={loading} aria-label="Refresh run history">
+            {loading ? <span className="spinner" aria-label="Loading" /> : 'Refresh'}
+          </button>
+        </div>
+      </div>
+      <div style={{ margin: '6px 0 18px 0', color: '#888', fontSize: '1.02em' }}>{pipeline.description}</div>
       {error && <div className="dashboard-error">{error}</div>}
       <div className="dashboard-table-wrapper">
         <table className="dashboard-table">
           <thead>
             <tr>
               <th>Run</th>
-              <th>Issue</th>
+              <th>Branch/Issue</th>
               <th>Status</th>
               <th>Started</th>
               <th>PR</th>
@@ -301,7 +347,9 @@ function PipelineRunDashboard() {
                   <td><a href={run.html_url} target="_blank" rel="noopener noreferrer">#{run.id}</a></td>
                   <td>{issueNum ? (
                     <a href={`https://agentic-ai-sdlc.atlassian.net/browse/JIRAFIX-${issueNum}`} target="_blank" rel="noopener noreferrer">JIRAFIX-{issueNum}</a>
-                  ) : <span className="no-issue">—</span>}</td>
+                  ) : (
+                    <span>{run.head_branch}</span>
+                  )}</td>
                   <td>{getStatusBadge(run.status, run.conclusion)}</td>
                   <td>{getRelativeTime(run.created_at)}</td>
                   <td>{prInfo ? (
@@ -383,9 +431,9 @@ function IssuesPage() {
 
       // Map GitHub issues to the shape the table expects
       const mapped = data.filter((issue: any) => !issue.pull_request).map((issue: any) => {
-        const keyMatch = issue.title.match(/^\[([A-Z]+-\d+)\]/);
+        const keyMatch = issue.title.match(/\[([A-Z]+-\d+)\]/);
         const key = keyMatch ? keyMatch[1] : `GH-${issue.number}`;
-        const summary = issue.title.replace(/^\[[A-Z]+-\d+\]\s*/, '');
+        const summary = issue.title.replace(/\[[A-Z]+-\d+\]\s*/, '');
         const labels: string[] = issue.labels.map((l: any) => l.name);
         const status = labels.find((l: string) => ['To Do', 'In Progress', 'Done'].includes(l)) || 'To Do';
         const priority = labels.find((l: string) => ['High', 'Medium', 'Low'].includes(l)) || 'Medium';
