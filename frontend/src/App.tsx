@@ -18,7 +18,7 @@ const MoonIcon = () => (
 );
 
 // --- Interactive Map Page ---
-import 'leaflet/dist/leaflet.css';
+
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
 import ReactDOM from 'react-dom';
