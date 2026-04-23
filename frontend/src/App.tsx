@@ -385,7 +385,7 @@ function IssuesPage() {
       const data = await resp.json();
 
       // Map GitHub issues to the shape the table expects
-      const mapped = data.map((issue: any) => {
+      const mapped = data.filter((issue: any) => !issue.pull_request).map((issue: any) => {
         const keyMatch = issue.title.match(/^\[([A-Z]+-\d+)\]/);
         const key = keyMatch ? keyMatch[1] : `GH-${issue.number}`;
         const summary = issue.title.replace(/^\[[A-Z]+-\d+\]\s*/, '');
@@ -441,16 +441,16 @@ function IssuesPage() {
               <tr><td colSpan={7} style={{ textAlign: 'center' }}>No issues found.</td></tr>
             )}
             {issues.map((issue) => (
-              <tr key={issue.id}>
+              <tr key={issue.key}>
                 <td>
-                  <a href={`https://agentic-ai-sdlc.atlassian.net/browse/${issue.key}`} target="_blank" rel="noopener noreferrer">{issue.key}</a>
+                  <a href={issue.url} target="_blank" rel="noopener noreferrer">{issue.key}</a>
                 </td>
-                <td>{issue.fields.summary}</td>
-                <td>{getJiraStatusBadge(issue.fields.status.name)}</td>
-                <td>{getJiraPriorityBadge(issue.fields.priority.name)}</td>
-                <td>{getJiraTypeBadge(issue.fields.issuetype.name)}</td>
-                <td>{getJiraRelativeTime(issue.fields.created)}</td>
-                <td>{getJiraRelativeTime(issue.fields.updated)}</td>
+                <td>{issue.summary}</td>
+                <td>{getJiraStatusBadge(issue.status)}</td>
+                <td>{getJiraPriorityBadge(issue.priority)}</td>
+                <td>{getJiraTypeBadge(issue.type)}</td>
+                <td>—</td>
+                <td>—</td>
               </tr>
             ))}
           </tbody>
