@@ -407,9 +407,9 @@ jobs:
           # issue title so it doesn't appear twice when we prepend it below
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z]\+-[0-9]\+\][[:space:]]*//')
           if [ -n "$JIRA_KEY" ]; then
-            PR_TITLE="[${JIRA_KEY}] ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
+            PR_TITLE="Refs#${JIRA_KEY} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
           else
-            PR_TITLE="[AI Fix] ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
+            PR_TITLE="Refs#GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
           fi
 
           # Build PR body — embed the Jira key so close-on-merge.yml can find it
