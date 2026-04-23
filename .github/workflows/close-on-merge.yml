@@ -16,7 +16,12 @@ jobs:
 
     steps:
       - name: Check dependencies
-        run: jq --version
+        run: |
+          if ! command -v jq &>/dev/null; then
+            echo "jq not found, installing..."
+            sudo apt-get install -y -qq jq
+          fi
+          jq --version
 
       - name: Extract Jira key from PR body
         id: find_key

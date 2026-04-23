@@ -48,7 +48,12 @@ jobs:
           fetch-depth: 0
 
       - name: Check dependencies
-        run: jq --version
+        run: |
+          if ! command -v jq &>/dev/null; then
+            echo "jq not found, installing..."
+            sudo apt-get install -y -qq jq
+          fi
+          jq --version
 
       - name: Resolve issue number and title
         id: resolve
