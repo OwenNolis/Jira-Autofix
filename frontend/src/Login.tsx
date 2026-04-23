@@ -20,29 +20,34 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
   return (
     <div className="login">
-      <h1>Login</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="username">Username:</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="password">Password:</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        {error && <p className="error">{error}</p>}
-        <button type="submit">Login</button>
-      </form>
+      <div className="login-card">
+        <h1 className="login-title">Jira Autofix</h1>
+        <p className="login-subtitle">Sign in to continue</p>
+        <form onSubmit={handleSubmit}>
+          <div className="login-field">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+            />
+          </div>
+          <div className="login-field">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          {error && <div className="error" role="alert">{error}</div>}
+          <button type="submit" className="login-btn">Login</button>
+        </form>
+      </div>
     </div>
   );
 }
