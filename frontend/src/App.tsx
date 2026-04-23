@@ -375,18 +375,31 @@ function IssuesPage() {
     setLoading(true);
     setError(null);
     try {
-      // Use backend proxy to avoid CORS issues
-      const resp = await fetch('/api/jira/issues', {
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      if (!resp.ok) throw new Error(`Jira API error: ${resp.status}`);
+      // Jira issues are synced to GitHub Issues by the poller — fetch from
+      // GitHub instead to avoid CORS and auth problems with Jira's UI URLs.
+      const resp = await fetch(
+        'https://api.github.com/repos/OwenNolis/Jira-Autofix/issues?state=open&per_page=50',
+        { headers: { 'Accept': 'application/vnd.github+json' } }
+      );
+      if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
       const data = await resp.json();
-      setIssues(data.issues || []);
+
+      // Map GitHub issues to the shape the table expects
+      const mapped = data.map((issue: any) => {
+        const keyMatch = issue.title.match(/^\[([A-Z]+-\d+)\]/);
+        const key = keyMatch ? keyMatch[1] : `GH-${issue.number}`;
+        const summary = issue.title.replace(/^\[[A-Z]+-\d+\]\s*/, '');
+        const labels: string[] = issue.labels.map((l: any) => l.name);
+        const status = labels.find((l: string) => ['To Do', 'In Progress', 'Done'].includes(l)) || 'To Do';
+        const priority = labels.find((l: string) => ['High', 'Medium', 'Low'].includes(l)) || 'Medium';
+        const type = labels.find((l: string) => ['Bug', 'Task', 'Story'].includes(l)) || 'Task';
+        return { key, summary, status, priority, type, url: issue.html_url };
+      });
+
+      setIssues(mapped);
       setLastUpdated(Date.now());
     } catch (e: any) {
-      setError(e.message || 'Failed to fetch Jira issues');
+      setError(e.message || 'Failed to fetch issues');
     } finally {
       setLoading(false);
     }
