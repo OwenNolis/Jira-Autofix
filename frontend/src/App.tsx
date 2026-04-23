@@ -163,13 +163,13 @@ const PIPELINE_OPTIONS = [
   {
     key: 'jira-to-github-issue',
     label: 'Jira → GitHub Issue',
-    workflowFile: 'jira-to-github-issue.yml',
+    workflowFile: 'jira-poll.yml',
     description: 'Runs triggered by syncing Jira issues to GitHub',
   },
   {
     key: 'close-jira-on-pr-merge',
     label: 'Close Jira on PR Merge',
-    workflowFile: 'close-jira-on-pr-merge.yml',
+    workflowFile: 'close-on-merge.yml',
     description: 'Runs triggered by closing Jira issues when PRs are merged',
   },
 ];
@@ -256,7 +256,10 @@ function PipelineRunDashboard() {
     setError(null);
     try {
       const pipeline = PIPELINE_OPTIONS.find(p => p.key === pipelineKey) || PIPELINE_OPTIONS[0];
-      const resp = await fetch(`https://api.github.com/repos/OwenNolis/Jira-Autofix/actions/workflows/${pipeline.workflowFile}/runs?per_page=10`);
+      const ghToken = process.env.REACT_APP_GITHUB_TOKEN;
+      const ghHeaders: Record<string, string> = { 'Accept': 'application/vnd.github+json' };
+      if (ghToken) ghHeaders['Authorization'] = `Bearer ${ghToken}`;
+      const resp = await fetch(`https://api.github.com/repos/OwenNolis/Jira-Autofix/actions/workflows/${pipeline.workflowFile}/runs?per_page=10`, { headers: ghHeaders });
       if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
       const data = await resp.json();
       const runs: PipelineRun[] = data.workflow_runs.map((run: any) => ({
@@ -422,9 +425,12 @@ function IssuesPage() {
     try {
       // Jira issues are synced to GitHub Issues by the poller — fetch from
       // GitHub instead to avoid CORS and auth problems with Jira's UI URLs.
+      const ghToken = process.env.REACT_APP_GITHUB_TOKEN;
+      const ghHeaders: Record<string, string> = { 'Accept': 'application/vnd.github+json' };
+      if (ghToken) ghHeaders['Authorization'] = `Bearer ${ghToken}`;
       const resp = await fetch(
         'https://api.github.com/repos/OwenNolis/Jira-Autofix/issues?state=open&per_page=50',
-        { headers: { 'Accept': 'application/vnd.github+json' } }
+        { headers: ghHeaders }
       );
       if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
       const data = await resp.json();
