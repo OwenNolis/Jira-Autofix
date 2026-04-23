@@ -50,19 +50,42 @@ body.dark {
   --color-spinner: #ffd700;
 }
 
+/* --- UI Cleanliness & Professionalism Enhancements --- */
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  background: var(--color-card-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: #cfd8dc;
+  border-radius: 6px;
+}
+body.dark ::-webkit-scrollbar-thumb, .App.dark ::-webkit-scrollbar-thumb {
+  background: #444b5d;
+}
+
 .navigation-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
+  padding: 10px 24px;
   background-color: var(--color-nav);
-  transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  border-bottom: 1.5px solid var(--color-dropdown-border);
+  transition: background 0.2s, border 0.2s;
+}
+.App.dark .navigation-bar, body.dark .navigation-bar {
+  border-bottom: 1.5px solid var(--color-dropdown-border);
 }
 
 .nav-links {
   list-style: none;
   display: flex;
-  gap: 20px;
+  gap: 24px;
   margin: 0;
   padding: 0;
 }
@@ -70,13 +93,17 @@ body.dark {
 .nav-links li a {
   color: var(--color-nav-link);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 18px;
-  transition: color 0.2s;
+  letter-spacing: -0.5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
 }
 
-.nav-links li a:hover {
+.nav-links li a:hover, .nav-links li a.active {
   color: var(--color-nav-link-hover);
+  background: rgba(255, 215, 0, 0.08);
 }
 
 .nav-actions {
@@ -95,14 +122,14 @@ body.dark {
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: border-color 0.3s;
+  transition: border-color 0.3s, box-shadow 0.2s;
   object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
-
 .avatar:hover {
   border-color: var(--color-nav-link-hover);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
 }
-
 .avatar img {
   width: 100%;
   height: 100%;
@@ -115,22 +142,30 @@ body.dark {
   right: 0;
   background-color: var(--color-dropdown-bg);
   border: 1px solid var(--color-dropdown-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  padding: 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+  padding: 10px 0;
   z-index: 1000;
+  min-width: 140px;
+  animation: fadeIn 0.18s;
 }
-
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .dropdown-menu button {
   background-color: var(--color-button-bg);
   color: var(--color-nav-link);
   border: none;
-  padding: 10px;
+  padding: 10px 18px;
   border-radius: 4px;
   cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 500;
   transition: background 0.2s;
 }
-
 .dropdown-menu button:hover {
   background-color: var(--color-button-bg-hover);
 }
@@ -138,15 +173,30 @@ body.dark {
 .home-page, .about, .map-page {
   padding: 40px 20px;
   background: var(--color-card-bg);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   margin: 32px auto;
   max-width: 700px;
-  transition: background 0.2s;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.home-page h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--color-nav);
+  margin-bottom: 0.5em;
+  letter-spacing: -1px;
+}
+.home-page p {
+  font-size: 1.15rem;
+  color: var(--color-text);
+  margin-bottom: 2em;
 }
 
 .map-page h1 {
   color: var(--color-nav);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1em;
 }
 
 /* --- Essers Map Styles --- */
@@ -155,14 +205,14 @@ body.dark {
   margin: 32px auto;
   padding: 40px 10px 30px 10px;
   background: var(--color-card-bg);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .essers-map-container {
   width: 100%;
   min-height: 400px;
   margin: 0 auto 0 auto;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
 }
@@ -176,6 +226,8 @@ body.dark {
   color: #fff;
   background: #bdbdbd;
   vertical-align: middle;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .essers-popup-btn {
   background: #007bff;
@@ -188,6 +240,7 @@ body.dark {
   font-size: 1em;
   margin-top: 4px;
   transition: background 0.18s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .essers-popup-btn:hover {
   background: #0056b3;
@@ -212,6 +265,7 @@ body.dark {
   position: relative;
   animation: essers-slidein 0.22s cubic-bezier(0.4,0,0.2,1);
   overflow-y: auto;
+  border-left: 1.5px solid var(--color-dropdown-border);
 }
 @keyframes essers-slidein {
   from { transform: translateX(100%); opacity: 0; }
@@ -236,7 +290,7 @@ body.dark {
 .essers-sidepanel-section {
   margin-top: 18px;
   padding-top: 10px;
-  border-top: 1px solid #e0e4ea;
+  border-top: 1px solid var(--color-dropdown-border);
 }
 .App.dark .essers-sidepanel, body.dark .essers-sidepanel {
   background: #23272f;
@@ -280,6 +334,7 @@ body.dark {
   justify-content: center;
   transition: background 0.2s, color 0.2s;
   font-size: 22px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .dark-mode-toggle:hover {
   background: rgba(0,0,0,0.08);
@@ -321,19 +376,20 @@ body.dark {
 .pipeline-dashboard {
   margin-top: 36px;
   background: var(--color-card-bg);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   padding: 24px 16px 16px 16px;
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
-  transition: background 0.2s;
+  transition: background 0.2s, box-shadow 0.2s;
 }
 .pipeline-dashboard h2 {
   margin-top: 0;
   margin-bottom: 16px;
   font-size: 1.3rem;
   color: var(--color-nav);
+  font-weight: 700;
 }
 .refresh-btn {
   float: right;
@@ -349,6 +405,8 @@ body.dark {
   transition: background 0.2s;
   min-width: 90px;
   position: relative;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .refresh-btn:disabled {
   opacity: 0.7;
@@ -384,6 +442,7 @@ body.dark {
   border-radius: 6px;
   overflow: hidden;
   font-size: 1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .dashboard-table th, .dashboard-table td {
   padding: 10px 8px;
@@ -392,8 +451,9 @@ body.dark {
 }
 .dashboard-table th {
   background: var(--color-table-header);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-nav);
+  letter-spacing: 0.5px;
 }
 .dashboard-table tr:last-child td {
   border-bottom: none;
@@ -403,10 +463,12 @@ body.dark {
   padding: 3px 12px;
   border-radius: 12px;
   font-size: 0.95em;
-  font-weight: 500;
+  font-weight: 600;
   color: #fff;
   min-width: 70px;
   text-align: center;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .status-badge-success {
   background: var(--color-status-success);
@@ -434,5 +496,20 @@ body.dark {
   .pipeline-dashboard {
     padding: 12px 2px 8px 2px;
   }
+  .home-page, .about, .map-page {
+    padding: 18px 4px 12px 4px;
+  }
+}
+
+/* --- Accessibility & Focus States --- */
+:focus {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
+}
+
+/* --- General UI polish --- */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 1rem;
 }
 

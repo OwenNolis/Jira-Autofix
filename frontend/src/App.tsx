@@ -381,13 +381,17 @@ function AppContent() {
     });
   };
 
+  // Highlight active nav link
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <div className={`App${isDarkMode ? ' dark' : ''}`}>
       <nav className="navigation-bar">
         <ul className="nav-links">
-          <li><Link to="/">Home</Link></li>
-          <li><Link to="/about">About</Link></li>
-          <li><Link to="/map">Map</Link></li>
+          <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
+          <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
+          <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
         </ul>
         <div className="nav-actions">
           {/* Dark mode toggle button */}
