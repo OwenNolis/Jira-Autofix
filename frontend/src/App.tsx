@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link, us
 import './App.css';
 import About from './About';
 import Login from './Login';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L, { LatLngExpression } from 'leaflet';
+import ReactDOM from 'react-dom';
 
 // Sun and Moon SVG icons
 const SunIcon = () => (
@@ -17,11 +20,6 @@ const MoonIcon = () => (
   </svg>
 );
 
-// --- Interactive Map Page ---
-
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L, { LatLngExpression } from 'leaflet';
-import ReactDOM from 'react-dom';
 
 const ESSERS_LOCATIONS = [
   { name: "H. Essers HQ", address: "Transportlaan 4, 3600 Genk, Belgium", lat: 50.9659, lng: 5.4979, type: "Headquarters" },
