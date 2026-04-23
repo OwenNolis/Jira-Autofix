@@ -415,7 +415,7 @@ function IssuesPage() {
 
   return (
     <div className="issues-page">
-      <h1>Jira Issues (Jira-Autofix)</h1>
+      <h1>GitHub Issues (Jira-Autofix)</h1>
       <button className="refresh-btn" onClick={fetchIssues} disabled={loading} aria-label="Refresh issues list">
         {loading ? <span className="spinner" aria-label="Loading" /> : 'Refresh'}
       </button>
