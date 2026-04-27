@@ -60,19 +60,46 @@ jobs:
             echo "jira_key=" >> $GITHUB_OUTPUT
           fi
 
+      - name: Fetch OAuth access token
+        id: oauth
+        env:
+          CLIENT_ID:     ${{ secrets.GATEWAY_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.GATEWAY_CLIENT_SECRET }}
+          TOKEN_ENDPOINT: ${{ vars.SDLC_INTERNSHIP_TOKEN_ENDPOINT }}
+        run: |
+          BASIC_AUTH=$(echo -n "$CLIENT_ID:$CLIENT_SECRET" | base64)
+
+          RESPONSE=$(curl --fail --silent --show-error \
+            --request POST \
+            --url "$TOKEN_ENDPOINT" \
+            --header "Content-Type: application/x-www-form-urlencoded" \
+            --header "Authorization: Basic $BASIC_AUTH" \
+            --data "grant_type=client_credentials")
+
+          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "::error::Failed to obtain OAuth access token from gateway"
+            exit 1
+          fi
+
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "OAuth token obtained successfully"
+
       - name: Close Jira issue
         if: steps.find_key.outputs.jira_key != ''
         env:
-          JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          JIRA_DOMAIN:    ${{ vars.JIRA_DOMAIN }}
-          ISSUE_KEY:      ${{ steps.find_key.outputs.jira_key }}
+          GATEWAY_TOKEN: ${{ steps.oauth.outputs.token }}
+          JIRA_GATEWAY_BASE: ${{ vars.SDLC_INTERNSHIP_JIRA_BASE_ENDPOINT }}
+          ISSUE_KEY:     ${{ steps.find_key.outputs.jira_key }}
         run: |
           echo "Closing Jira issue: $ISSUE_KEY"
 
           TRANSITIONS=$(curl -s \
-            "https://${JIRA_DOMAIN}/rest/api/3/issue/${ISSUE_KEY}/transitions" \
-            -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}")
+            --header "Authorization: Bearer $GATEWAY_TOKEN" \
+            --header "Accept: application/json" \
+            "${JIRA_GATEWAY_BASE}/issue/${ISSUE_KEY}/transitions")
 
           TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r '
             .transitions[] |
@@ -86,9 +113,9 @@ jobs:
           fi
 
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-            "https://${JIRA_DOMAIN}/rest/api/3/issue/${ISSUE_KEY}/transitions" \
-            -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
-            -H "Content-Type: application/json" \
+            --header "Authorization: Bearer $GATEWAY_TOKEN" \
+            --header "Content-Type: application/json" \
+            "${JIRA_GATEWAY_BASE}/issue/${ISSUE_KEY}/transitions" \
             -d "{\"transition\": {\"id\": \"${TRANSITION_ID}\"}}")
 
           if [ "$HTTP" = "204" ]; then
