@@ -1,0 +1,124 @@
+# Triggered by a Jira automation webhook (via Gravitee gateway) when an
+# issue gets the "ai-fix" label. Creates a GitHub issue and dispatches
+# the AI fix workflow — no Jira polling or API credentials needed.
+
+name: Jira Label Trigger
+
+on:
+  repository_dispatch:
+    types: [jira-ai-fix]
+
+jobs:
+  handle:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+      actions: write
+
+    steps:
+      - name: Check dependencies
+        run: |
+          if ! command -v jq &>/dev/null; then
+            echo "jq not found, installing..."
+            sudo apt-get install -y -qq jq
+          fi
+          jq --version
+
+      - name: Create GitHub issue from Jira payload
+        id: create_issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JIRA_DOMAIN:  ${{ vars.JIRA_DOMAIN }}
+          # Fields sent by Jira automation in the webhook payload
+          ISSUE_KEY:    ${{ github.event.client_payload.issue_key }}
+          SUMMARY:      ${{ github.event.client_payload.summary }}
+          DESCRIPTION:  ${{ github.event.client_payload.description }}
+          PRIORITY:     ${{ github.event.client_payload.priority }}
+          ISSUE_TYPE:   ${{ github.event.client_payload.issue_type }}
+          STATUS:       ${{ github.event.client_payload.status }}
+        run: |
+          echo "Received Jira issue: $ISSUE_KEY — $SUMMARY"
+
+          # Skip if a GitHub issue already exists for this Jira key
+          EXISTING=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues?labels=jira:${ISSUE_KEY}&state=all" \
+            | jq 'length')
+
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "⏭️  GitHub issue already exists for $ISSUE_KEY — skipping"
+            echo "gh_number=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Ensure the per-issue label exists
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/labels" \
+            -d "{\"name\":\"jira:${ISSUE_KEY}\",\"color\":\"0052CC\",\"description\":\"Linked to Jira ${ISSUE_KEY}\"}" \
+            > /dev/null 2>&1 || true
+
+          ISSUE_URL="https://${JIRA_DOMAIN}/browse/${ISSUE_KEY}"
+
+          BODY=$(python3 -c "
+          import os
+          key       = os.environ['ISSUE_KEY']
+          url       = os.environ['ISSUE_URL'] if 'ISSUE_URL' in os.environ else ''
+          itype     = os.environ.get('ISSUE_TYPE', 'Task')
+          priority  = os.environ.get('PRIORITY', 'Medium')
+          status    = os.environ.get('STATUS', 'To Do')
+          desc      = os.environ.get('DESCRIPTION', 'No description provided.')
+          print(
+              '<!-- jira-key: ' + key + ' -->\n'
+              '## Jira: [' + key + '](' + '$ISSUE_URL' + ')\n\n'
+              '| Field | Value |\n'
+              '|-------|-------|\n'
+              '| **Type** | ' + itype + ' |\n'
+              '| **Priority** | ' + priority + ' |\n'
+              '| **Status** | ' + status + ' |\n\n'
+              '## Description\n\n' + desc + '\n\n'
+              '---\n'
+              '*Auto-created from Jira ai-fix label. The AI fix workflow has been triggered automatically.*'
+          )
+          " ISSUE_URL="$ISSUE_URL")
+
+          PAYLOAD=$(python3 -c "
+          import json, os
+          print(json.dumps({
+              'title': '[' + os.environ['ISSUE_KEY'] + '] ' + os.environ['SUMMARY'],
+              'body': os.environ['BODY'],
+              'labels': ['jira:' + os.environ['ISSUE_KEY'], 'from-jira', 'ai-fix']
+          }))" BODY="$BODY")
+
+          RESPONSE=$(echo "$PAYLOAD" | curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues" \
+            -d @-)
+
+          GH_NUMBER=$(echo "$RESPONSE" | jq -r '.number // empty')
+          GH_URL=$(echo "$RESPONSE"    | jq -r '.html_url // empty')
+
+          if [ -n "$GH_NUMBER" ]; then
+            echo "✅ Created GitHub issue #${GH_NUMBER}: ${GH_URL}"
+            echo "gh_number=$GH_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to create GitHub issue"
+            echo "$RESPONSE" | head -c 400
+            exit 1
+          fi
+
+      - name: Dispatch AI fix workflow
+        if: steps.create_issue.outputs.gh_number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/ai-fix-from-issue.yml/dispatches" \
+            -d "{\"ref\": \"main\", \"inputs\": {\"issue_number\": \"${{ steps.create_issue.outputs.gh_number }}\"}}"
+          echo "🤖 AI fix dispatched for issue #${{ steps.create_issue.outputs.gh_number }}"
