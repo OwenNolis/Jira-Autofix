@@ -46,6 +46,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `JIRA_EMAIL` | Service account email for Jira authentication |
 | `JIRA_API_TOKEN` | Jira API token |
 | `GEMINI_API_KEY` | Google Gemini API key |
+| `COPILOT_PAT`    | Copilot Personal Access Token |
 
 ### 2. Variables
 
@@ -57,6 +58,7 @@ In the same page under **Variables**:
 | `JIRA_PROJECT_KEY` | `PROJ` |
 | `JIRA_JQL_FILTER` | `project=PROJ AND status != Done AND labels = needs-code-change ORDER BY created DESC` |
 | `GEMINI_MODEL` | `gemini-2.5-flash` |
+| `AI_PROVIDER` | `gituhb` |
 
 ### 3. Labels
 
