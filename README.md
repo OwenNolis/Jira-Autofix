@@ -1,5 +1,5 @@
 # Jira-Autofix
-Automated pipeline that syncs Jira issues to GitHub, uses Gemini AI to generate code fixes, opens a pull request with the solution, and closes both the GitHub issue and the original Jira ticket on merge.
+Automated pipeline that syncs Jira issues to GitHub, uses Gemini AI / Copilot CLI to generate code fixes, opens a pull request with the solution, and closes both the GitHub issue and the original Jira ticket on merge.
 
 ---
 
@@ -14,7 +14,7 @@ Jira Issue (label: needs-code-change)
         │
         ▼  label "ai-fix" added  OR  comment "!fix"
 [ai-fix-from-issue.yml]
-  Reads the issue → builds repo context → calls Gemini AI → applies code changes
+  Reads the issue → builds repo context → calls Gemini AI or Copilot CLI → applies code changes
         │
         ▼
   Pull Request opened  (branch: ai-fix/issue-N-TIMESTAMP)
@@ -30,6 +30,7 @@ Jira Issue (label: needs-code-change)
 
 - A Jira project with API access
 - A Google Gemini API key
+- A Personal Access Token (PAT) for Copilot CLI
 - (Optional) A Kubernetes cluster if you want K8s to act as the orchestrator instead of the GitHub Actions scheduler
 
 ---
