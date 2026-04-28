@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+}
 
 function Notifications() {
   // Demo placeholder: static notifications
-  const notifications = [
+  const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: 1,
       title: 'Welcome to Notifications!',
@@ -24,7 +32,30 @@ function Notifications() {
       date: new Date(Date.now() - 2 * 3600 * 1000).toLocaleString(),
       read: true,
     },
-  ];
+  ]);
+
+  const [newTitle, setNewTitle] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleAddNotification = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newMessage.trim()) {
+      setFormError('Title and message are required.');
+      return;
+    }
+    const newNotification: Notification = {
+      id: notifications.length > 0 ? Math.max(...notifications.map(n => n.id)) + 1 : 1,
+      title: newTitle,
+      message: newMessage,
+      date: new Date().toLocaleString(),
+      read: false,
+    };
+    setNotifications([newNotification, ...notifications]);
+    setNewTitle('');
+    setNewMessage('');
+    setFormError(null);
+  };
 
   return (
     <div className="notifications-page" style={{
@@ -37,6 +68,65 @@ function Notifications() {
       transition: 'background 0.2s, box-shadow 0.2s',
     }}>
       <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--color-nav)', marginBottom: '0.5em', letterSpacing: '-1px' }}>Notifications</h1>
+      <form onSubmit={handleAddNotification} style={{
+        marginBottom: 28,
+        background: '#f8fafc',
+        borderRadius: 8,
+        border: '1px solid #e0e4ea',
+        padding: '18px 16px 14px 16px',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        maxWidth: 500,
+      }}>
+        <div style={{ fontWeight: 600, fontSize: '1.13rem', color: 'var(--color-nav)', marginBottom: 2 }}>Add New Notification</div>
+        <input
+          type="text"
+          placeholder="Title"
+          value={newTitle}
+          onChange={e => setNewTitle(e.target.value)}
+          style={{
+            padding: '10px',
+            borderRadius: 6,
+            border: '1px solid #ccc',
+            fontSize: '1rem',
+            marginBottom: 0,
+          }}
+          aria-label="Notification title"
+        />
+        <textarea
+          placeholder="Message"
+          value={newMessage}
+          onChange={e => setNewMessage(e.target.value)}
+          style={{
+            padding: '10px',
+            borderRadius: 6,
+            border: '1px solid #ccc',
+            fontSize: '1rem',
+            minHeight: 60,
+            marginBottom: 0,
+            resize: 'vertical',
+          }}
+          aria-label="Notification message"
+        />
+        {formError && <div style={{ color: '#d32f2f', fontSize: '0.98rem', marginBottom: 0 }}>{formError}</div>}
+        <button
+          type="submit"
+          style={{
+            alignSelf: 'flex-end',
+            padding: '8px 22px',
+            borderRadius: 6,
+            border: 'none',
+            background: 'var(--color-button-bg)',
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: '1.05rem',
+            cursor: 'pointer',
+            transition: 'background 0.2s',
+          }}
+        >Add Notification</button>
+      </form>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {notifications.map((n) => (
           <div key={n.id} style={{
