@@ -21,8 +21,19 @@ const MoonIcon = () => (
   </svg>
 );
 
+interface NavigationBarProps {
+  isDarkMode: boolean;
+  handleToggleDarkMode: () => void;
+  isAuthenticated: boolean;
+  handleLogout: () => void;
+  isAvatarMenuOpen: boolean;
+  toggleAvatarMenu: () => void;
+  avatarMenuRef: React.RefObject<HTMLDivElement | null>;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+}
+
 // Navigation bar extracted as a component for clarity and reusability
-function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, handleLogout, isAvatarMenuOpen, toggleAvatarMenu, avatarMenuRef, audioRef }) {
+function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, handleLogout, isAvatarMenuOpen, toggleAvatarMenu, avatarMenuRef, audioRef }: NavigationBarProps) {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
