@@ -7,6 +7,7 @@ import Profile from './Profile';
 import EssersMap from './components/EssersMap';
 import PipelineRunDashboard from './components/PipelineRunDashboard';
 import IssuesPage from './components/IssuesPage';
+import Settings from './components/Settings';
 
 // Sun and Moon SVG icons
 const SunIcon = () => (
@@ -45,6 +46,7 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
         <li><Link to="/issues" className={isActive('/issues') ? 'active' : ''}>Issues</Link></li>
         <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
         <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link></li>
+        <li><Link to="/settings" className={isActive('/settings') ? 'active' : ''}>Settings</Link></li>
       </ul>
       <div className="nav-actions">
         {/* Dark mode toggle button */}
@@ -176,6 +178,10 @@ function AppContent() {
         <Route
           path="/profile"
           element={isAuthenticated ? <Profile /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/settings"
+          element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
         />
         <Route
           path="/"
