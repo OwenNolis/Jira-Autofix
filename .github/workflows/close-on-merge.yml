@@ -66,16 +66,14 @@ jobs:
         if: steps.find_key.outputs.jira_key != ''
         env:
           JIRA_DONE_WEBHOOK: ${{ vars.JIRA_DONE_WEBHOOK }}
-          JIRA_WEBHOOK_SECRET: ${{ secrets.JIRA_WEBHOOK_SECRET }}
           ISSUE_KEY: ${{ steps.find_key.outputs.jira_key }}
         run: |
           echo "Closing Jira issue: $ISSUE_KEY"
 
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Automation-Signature: $JIRA_WEBHOOK_SECRET" \
             "$JIRA_DONE_WEBHOOK" \
-            -d "{\"issues\": [{\"key\": \"${ISSUE_KEY}\"}]}")
+            -d "{\"issues\": [\"${ISSUE_KEY}\"]}")
 
           if [ "$HTTP" = "200" ] || [ "$HTTP" = "204" ]; then
             echo "✅ Jira issue $ISSUE_KEY closed via automation webhook (HTTP $HTTP)"
