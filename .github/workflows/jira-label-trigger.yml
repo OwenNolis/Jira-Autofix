@@ -61,19 +61,19 @@ jobs:
             -d "{\"name\":\"jira:${ISSUE_KEY}\",\"color\":\"0052CC\",\"description\":\"Linked to Jira ${ISSUE_KEY}\"}" \
             > /dev/null 2>&1 || true
 
-          ISSUE_URL="https://${JIRA_DOMAIN}/browse/${ISSUE_KEY}"
+          export ISSUE_URL="https://${JIRA_DOMAIN}/browse/${ISSUE_KEY}"
 
-          BODY=$(python3 -c "
+          export BODY=$(python3 -c "
           import os
-          key       = os.environ['ISSUE_KEY']
-          url       = os.environ['ISSUE_URL'] if 'ISSUE_URL' in os.environ else ''
-          itype     = os.environ.get('ISSUE_TYPE', 'Task')
-          priority  = os.environ.get('PRIORITY', 'Medium')
-          status    = os.environ.get('STATUS', 'To Do')
-          desc      = os.environ.get('DESCRIPTION', 'No description provided.')
+          key      = os.environ['ISSUE_KEY']
+          url      = os.environ.get('ISSUE_URL', '')
+          itype    = os.environ.get('ISSUE_TYPE', 'Task')
+          priority = os.environ.get('PRIORITY', 'Medium')
+          status   = os.environ.get('STATUS', 'To Do')
+          desc     = os.environ.get('DESCRIPTION', 'No description provided.')
           print(
               '<!-- jira-key: ' + key + ' -->\n'
-              '## Jira: [' + key + '](' + '$ISSUE_URL' + ')\n\n'
+              '## Jira: [' + key + '](' + url + ')\n\n'
               '| Field | Value |\n'
               '|-------|-------|\n'
               '| **Type** | ' + itype + ' |\n'
@@ -83,7 +83,7 @@ jobs:
               '---\n'
               '*Auto-created from Jira ai-fix label. The AI fix workflow has been triggered automatically.*'
           )
-          " ISSUE_URL="$ISSUE_URL")
+          ")
 
           PAYLOAD=$(python3 -c "
           import json, os
@@ -91,7 +91,7 @@ jobs:
               'title': '[' + os.environ['ISSUE_KEY'] + '] ' + os.environ['SUMMARY'],
               'body': os.environ['BODY'],
               'labels': ['jira:' + os.environ['ISSUE_KEY'], 'from-jira', 'ai-fix']
-          }))" BODY="$BODY")
+          }))")
 
           RESPONSE=$(echo "$PAYLOAD" | curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
