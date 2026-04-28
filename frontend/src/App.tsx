@@ -8,6 +8,7 @@ import EssersMap from './components/EssersMap';
 import PipelineRunDashboard from './components/PipelineRunDashboard';
 import IssuesPage from './components/IssuesPage';
 import Settings from './components/Settings';
+import Notifications from './components/Notifications';
 
 // Sun and Moon SVG icons
 const SunIcon = () => (
@@ -44,6 +45,7 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
         <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
         <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
         <li><Link to="/issues" className={isActive('/issues') ? 'active' : ''}>Issues</Link></li>
+        <li><Link to="/notifications" className={isActive('/notifications') ? 'active' : ''}>Notifications</Link></li>
         <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
         <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link></li>
         <li><Link to="/settings" className={isActive('/settings') ? 'active' : ''}>Settings</Link></li>
@@ -174,6 +176,10 @@ function AppContent() {
         <Route
           path="/issues"
           element={isAuthenticated ? <IssuesPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/notifications"
+          element={isAuthenticated ? <Notifications /> : <Navigate to="/login" />}
         />
         <Route
           path="/profile"
