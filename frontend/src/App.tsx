@@ -21,6 +21,53 @@ const MoonIcon = () => (
   </svg>
 );
 
+// Navigation bar extracted as a component for clarity and reusability
+function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, handleLogout, isAvatarMenuOpen, toggleAvatarMenu, avatarMenuRef, audioRef }) {
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
+
+  return (
+    <nav className="navigation-bar">
+      <ul className="nav-links">
+        <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
+        <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
+        <li><Link to="/issues" className={isActive('/issues') ? 'active' : ''}>Issues</Link></li>
+        <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
+        <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link></li>
+      </ul>
+      <div className="nav-actions">
+        {/* Dark mode toggle button */}
+        <button
+          className="dark-mode-toggle"
+          onClick={handleToggleDarkMode}
+          aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          type="button"
+        >
+          {isDarkMode ? <SunIcon /> : <MoonIcon />}
+        </button>
+        {isAuthenticated && (
+          <div className="avatar-menu" ref={avatarMenuRef}>
+            <img
+              src="/Hessi.png"
+              alt="User Avatar"
+              className="avatar"
+              onClick={toggleAvatarMenu}
+            />
+            {/* Use local horn.mp3 instead of remote sound */}
+            <audio ref={audioRef} src="/horn.mp3" preload="auto" />
+            {isAvatarMenuOpen && (
+              <div className="dropdown-menu">
+                <button onClick={handleLogout}>Logout</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 // Inner component — rendered inside <Router> so useNavigate is valid here
 function AppContent() {
   const [isLoading, setIsLoading] = useState(false);
@@ -86,50 +133,18 @@ function AppContent() {
     });
   };
 
-  // Highlight active nav link
-  const location = useLocation();
-  const isActive = (path: string) => location.pathname === path;
-
   return (
     <div className={`App${isDarkMode ? ' dark' : ''}`}>
-      <nav className="navigation-bar">
-        <ul className="nav-links">
-          <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
-          <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
-          <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
-          <li><Link to="/issues" className={isActive('/issues') ? 'active' : ''}>Issues</Link></li>
-          <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link></li>
-        </ul>
-        <div className="nav-actions">
-          {/* Dark mode toggle button */}
-          <button
-            className="dark-mode-toggle"
-            onClick={handleToggleDarkMode}
-            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            type="button"
-          >
-            {isDarkMode ? <SunIcon /> : <MoonIcon />}
-          </button>
-          {isAuthenticated && (
-            <div className="avatar-menu" ref={avatarMenuRef}>
-              <img
-                src="/Hessi.png"
-                alt="User Avatar"
-                className="avatar"
-                onClick={toggleAvatarMenu}
-              />
-              {/* Use local horn.mp3 instead of remote sound */}
-              <audio ref={audioRef} src="/horn.mp3" preload="auto" />
-              {isAvatarMenuOpen && (
-                <div className="dropdown-menu">
-                  <button onClick={handleLogout}>Logout</button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </nav>
+      <NavigationBar
+        isDarkMode={isDarkMode}
+        handleToggleDarkMode={handleToggleDarkMode}
+        isAuthenticated={isAuthenticated}
+        handleLogout={handleLogout}
+        isAvatarMenuOpen={isAvatarMenuOpen}
+        toggleAvatarMenu={toggleAvatarMenu}
+        avatarMenuRef={avatarMenuRef}
+        audioRef={audioRef}
+      />
       <Routes>
         <Route
           path="/login"
