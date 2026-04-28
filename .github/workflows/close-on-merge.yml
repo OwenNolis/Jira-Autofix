@@ -1,4 +1,6 @@
-# When a PR is merged, extract the Jira key from the PR body and close the Jira issue. The GitHub issue is closed automatically by GitHub because of Fixes #N in the PR body.
+# When a PR is merged, extract the Jira key from the PR body and close the Jira issue via
+# a Jira automation incoming webhook. The GitHub issue is closed automatically by GitHub
+# because of Fixes #N in the PR body.
 
 name: Close Jira Issue on PR Merge
 
@@ -60,66 +62,23 @@ jobs:
             echo "jira_key=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Fetch OAuth access token
-        id: oauth
-        env:
-          CLIENT_ID:     ${{ secrets.GATEWAY_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.GATEWAY_CLIENT_SECRET }}
-          TOKEN_ENDPOINT: ${{ vars.SDLC_INTERNSHIP_TOKEN_ENDPOINT }}
-        run: |
-          BASIC_AUTH=$(echo -n "$CLIENT_ID:$CLIENT_SECRET" | base64)
-
-          RESPONSE=$(curl --fail --silent --show-error \
-            --request POST \
-            --url "$TOKEN_ENDPOINT" \
-            --header "Content-Type: application/x-www-form-urlencoded" \
-            --header "Authorization: Basic $BASIC_AUTH" \
-            --data "grant_type=client_credentials")
-
-          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
-
-          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
-            echo "::error::Failed to obtain OAuth access token from gateway"
-            exit 1
-          fi
-
-          echo "::add-mask::$ACCESS_TOKEN"
-          echo "token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
-          echo "OAuth token obtained successfully"
-
-      - name: Close Jira issue
+      - name: Close Jira issue via automation webhook
         if: steps.find_key.outputs.jira_key != ''
         env:
-          GATEWAY_TOKEN: ${{ steps.oauth.outputs.token }}
-          JIRA_GATEWAY_BASE: ${{ vars.SDLC_INTERNSHIP_JIRA_BASE_ENDPOINT }}
-          ISSUE_KEY:     ${{ steps.find_key.outputs.jira_key }}
+          JIRA_DONE_WEBHOOK: ${{ vars.JIRA_DONE_WEBHOOK }}
+          JIRA_WEBHOOK_SECRET: ${{ secrets.JIRA_WEBHOOK_SECRET }}
+          ISSUE_KEY: ${{ steps.find_key.outputs.jira_key }}
         run: |
           echo "Closing Jira issue: $ISSUE_KEY"
 
-          TRANSITIONS=$(curl -s \
-            --header "Authorization: Bearer $GATEWAY_TOKEN" \
-            --header "Accept: application/json" \
-            "${JIRA_GATEWAY_BASE}/issue/${ISSUE_KEY}/transitions")
-
-          TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r '
-            .transitions[] |
-            select(.name == "Done" or .name == "Closed" or .name == "Resolve Issue") |
-            .id' | head -1)
-
-          if [ -z "$TRANSITION_ID" ]; then
-            echo "❌ No closing transition found for $ISSUE_KEY"
-            echo "Available transitions: $(echo "$TRANSITIONS" | jq -r '.transitions[].name')"
-            exit 0   # Don't fail the workflow — this is a Jira config issue
-          fi
-
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-            --header "Authorization: Bearer $GATEWAY_TOKEN" \
-            --header "Content-Type: application/json" \
-            "${JIRA_GATEWAY_BASE}/issue/${ISSUE_KEY}/transitions" \
-            -d "{\"transition\": {\"id\": \"${TRANSITION_ID}\"}}")
+            -H "Content-Type: application/json" \
+            -H "X-Automation-Signature: $JIRA_WEBHOOK_SECRET" \
+            "$JIRA_DONE_WEBHOOK" \
+            -d "{\"issues\": [\"${ISSUE_KEY}\"]}")
 
-          if [ "$HTTP" = "204" ]; then
-            echo "✅ Jira issue $ISSUE_KEY closed (HTTP 204)"
+          if [ "$HTTP" = "200" ] || [ "$HTTP" = "204" ]; then
+            echo "✅ Jira issue $ISSUE_KEY closed via automation webhook (HTTP $HTTP)"
           else
             echo "⚠️ Unexpected HTTP ${HTTP} when closing $ISSUE_KEY"
           fi
