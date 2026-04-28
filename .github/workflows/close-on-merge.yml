@@ -75,7 +75,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-Automation-Signature: $JIRA_WEBHOOK_SECRET" \
             "$JIRA_DONE_WEBHOOK" \
-            -d "{\"issues\": [\"${ISSUE_KEY}\"]}")
+            -d "{\"issues\": [{\"key\": \"${ISSUE_KEY}\"}]}")
 
           if [ "$HTTP" = "200" ] || [ "$HTTP" = "204" ]; then
             echo "✅ Jira issue $ISSUE_KEY closed via automation webhook (HTTP $HTTP)"
