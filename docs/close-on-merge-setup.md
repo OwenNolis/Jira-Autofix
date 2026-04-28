@@ -4,6 +4,28 @@ When a PR is merged in GitHub, this feature automatically transitions the linked
 
 ---
 
+## Why Credentials Are Required
+
+The key difference between setting "In Progress" and setting "Closed" is the **direction of the API call**:
+
+- **In Progress** — Jira sets its own status. The Jira automation rule runs *inside* Jira when the `ai-fix` label is added. No external API call is made. Jira simply transitions itself.
+
+- **Closed** — GitHub needs to call *back into* Jira when the PR is merged. That is an outbound call from GitHub → Jira API, which requires authentication. There is no way for an external system to modify Jira's state without proving who it is.
+
+```
+Jira → GitHub  ✅  works — Jira uses a PAT you gave it to call GitHub
+GitHub → Jira  ❌  blocked — GitHub needs OAuth credentials to call Jira
+```
+
+There is no way around this for the close step. Any approach that closes the Jira issue from GitHub requires credentials:
+
+1. **OAuth via Gravitee gateway** (this guide) — GitHub fetches a token and calls the Jira transitions API directly
+2. **Jira automation incoming webhook** — GitHub POSTs to a Jira webhook URL, but `api-private.atlassian.com` requires OAuth to authenticate the caller, so it does not work without credentials either
+
+The cleanest solution is Option 1 — add the 4 gateway variables once and the full lifecycle works automatically.
+
+---
+
 ## How It Works
 
 ```
