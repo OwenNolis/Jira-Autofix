@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       - name: Check dependencies
@@ -69,11 +69,18 @@ jobs:
           ISSUE_KEY: ${{ steps.find_key.outputs.jira_key }}
         run: |
           echo "Closing Jira issue: $ISSUE_KEY"
+          BODY="{\"issues\": [\"${ISSUE_KEY}\"]}"
+          echo "Payload: $BODY"
 
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
             -H "Content-Type: application/json" \
             "$JIRA_DONE_WEBHOOK" \
-            -d "{\"issues\": [\"${ISSUE_KEY}\"]}")
+            -d "$BODY")
+
+          HTTP=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+          RESP_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
+          echo "HTTP: $HTTP"
+          echo "Response body: $RESP_BODY"
 
           if [ "$HTTP" = "200" ] || [ "$HTTP" = "204" ]; then
             echo "✅ Jira issue $ISSUE_KEY closed via automation webhook (HTTP $HTTP)"
