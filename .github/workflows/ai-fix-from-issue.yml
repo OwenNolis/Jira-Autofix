@@ -31,7 +31,7 @@ jobs:
       (github.event_name == 'issues' && github.event.action == 'opened') ||
       (github.event_name == 'issues' && github.event.label.name == 'ai-fix') ||
       (github.event_name == 'issue_comment' &&
-       startsWith(github.event.comment.body, '!fix') &&
+       startsWith(github.event.comment.body, '/fix-ai') &&
        github.event.issue.pull_request == '')
 
     permissions:
@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Check dependencies
         run: |
@@ -187,7 +187,7 @@ jobs:
       - name: Run Copilot and capture output
         id: ai_fix
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT_TEST }}
         run: |
           copilot -p "$(cat copilot-prompt.txt)" \
             --model gpt-4.1 \
@@ -195,7 +195,7 @@ jobs:
             2>&1 | tee /tmp/copilot-output.log
 
           if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-            echo "::error::Copilot CLI failed — check COPILOT_PAT secret and CLI flags"
+            echo "::error::Copilot CLI failed — check COPILOT_PAT_TEST secret and CLI flags"
             exit 1
           fi
 
@@ -205,60 +205,46 @@ jobs:
       - name: Apply AI-generated file changes
         id: apply_changes
         run: |
-          python3 - <<'PYEOF'
-          import json, re, os, sys
+          RAW=$(cat /tmp/copilot-output.log)
 
-          raw = open("/tmp/copilot-output.log").read()
+          # Attempt 1: whole output is valid JSON with a "files" key
+          if ! JSON=$(printf '%s' "$RAW" | jq -e 'select(has("files"))' 2>/dev/null); then
+            # Attempt 2: extract the outermost {...} block containing "files" using PCRE
+            EXTRACTED=$(printf '%s' "$RAW" | grep -oP '(?s)\{.*"files".*\}' | head -1 || true)
+            JSON=$(printf '%s' "$EXTRACTED" | jq -e 'select(has("files"))' 2>/dev/null || true)
+          fi
 
-          # Try to extract JSON — look for the outermost {...} containing "files"
-          match = re.search(r'\{[\s\S]*"files"[\s\S]*\}', raw)
-          if not match:
-              print("No JSON file changes found in Copilot output.")
-              print("--- Copilot output ---")
-              print(raw[:2000])
-              sys.exit(0)
+          if [ -z "$JSON" ]; then
+            echo "No JSON file changes found in Copilot output."
+            echo "--- Copilot output (first 2000 chars) ---"
+            printf '%s' "$RAW" | head -c 2000
+            echo "No files written." > /tmp/ai_analysis.txt
+            exit 0
+          fi
 
-          try:
-              data = json.loads(match.group(0))
-          except json.JSONDecodeError as e:
-              print(f"JSON parse error: {e}")
-              print("Trying to salvage partial JSON...")
-              # Attempt to find the last complete file entry
-              partial = match.group(0)
-              # Truncate at last complete entry
-              last = partial.rfind('},')
-              if last != -1:
-                  partial = partial[:last+1] + ']}'
-                  try:
-                      data = json.loads('{"files": [' + partial.split('"files": [', 1)[1])
-                  except Exception:
-                      print("Could not salvage JSON, skipping.")
-                      sys.exit(0)
-              else:
-                  sys.exit(0)
+          FILE_COUNT=$(printf '%s' "$JSON" | jq '.files | length')
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "JSON parsed but no files listed."
+            echo "No files written." > /tmp/ai_analysis.txt
+            exit 0
+          fi
 
-          files = data.get("files", [])
-          if not files:
-              print("JSON parsed but no files listed.")
-              sys.exit(0)
+          WRITTEN=""
+          while IFS= read -r entry; do
+            PATH_VAL=$(printf '%s' "$entry" | jq -r '.path // "" | ltrimstr(" ") | rtrimstr(" ")')
+            [ -z "$PATH_VAL" ] && continue
+            mkdir -p "$(dirname "$PATH_VAL")"
+            printf '%s' "$entry" | jq -rj '.content // ""' > "$PATH_VAL"
+            echo "Wrote: $PATH_VAL"
+            WRITTEN="${WRITTEN:+$WRITTEN, }$PATH_VAL"
+          done < <(printf '%s' "$JSON" | jq -c '.files[]')
 
-          written = []
-          for entry in files:
-              path = entry.get("path", "").strip()
-              content = entry.get("content", "")
-              if not path:
-                  continue
-              os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
-              with open(path, "w") as f:
-                  f.write(content)
-              written.append(path)
-              print(f"Wrote: {path}")
-
-          # Save summary for PR body
-          summary = "AI applied changes to: " + ", ".join(written) if written else "No files written."
-          open("/tmp/ai_analysis.txt", "w").write(summary)
-          print(f"\nTotal files written: {len(written)}")
-          PYEOF
+          if [ -n "$WRITTEN" ]; then
+            echo "AI applied changes to: $WRITTEN" > /tmp/ai_analysis.txt
+          else
+            echo "No files written." > /tmp/ai_analysis.txt
+          fi
+          echo "Total files written: $FILE_COUNT"
 
       - name: Check for changes
         id: check_changes
@@ -305,13 +291,11 @@ jobs:
             echo "❌ Build failed"
 
             # Post a comment on the issue with the error
-            BUILD_ERRORS=$(grep -E "ERROR|error TS" /tmp/build-output.log | head -20 || tail -30 /tmp/build-output.log)
-            COMMENT_BODY=$(python3 -c "
-          import json, sys
-          errors = open('/tmp/build-output.log').read()[-3000:]
-          body = '🤖 **AI Fix Failed — Build Error**\n\nThe AI generated code changes but they did not compile. No PR was created.\n\n**Build errors:**\n\`\`\`\n' + errors + '\n\`\`\`\n\nTry adding more detail to the issue or use \`!fix <extra context>\` to guide the AI.'
-          print(json.dumps({'body': body}))
-          ")
+            BUILD_LOG_TAIL=$(tail -c 3000 /tmp/build-output.log)
+            COMMENT_BODY=$(jq -n \
+              --arg errors "$BUILD_LOG_TAIL" \
+              '{"body": ("🤖 **AI Fix Failed — Build Error**\n\nThe AI generated code changes but they did not compile. No PR was created.\n\n**Build errors:**\n```\n" + $errors + "\n```\n\nTry adding more detail to the issue or use `!fix <extra context>` to guide the AI.")}' \
+            )
             curl -s -X POST \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
@@ -329,57 +313,6 @@ jobs:
           JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
           AI_PROVIDER: ${{ vars.AI_PROVIDER }}
         run: |
-          PR_BODY_PY='
-          import json, os, subprocess
-
-          issue_num = os.environ["ISSUE_NUMBER"]
-          jira_key = os.environ.get("JIRA_KEY", "")
-          jira_domain = os.environ.get("JIRA_DOMAIN", "").rstrip("/")
-          ai_label = "GitHub Copilot (gpt-4.1)"
-          analysis = open("/tmp/ai_analysis.txt").read() \
-                     if os.path.exists("/tmp/ai_analysis.txt") else "AI-generated fix"
-
-          changed = subprocess.run(
-              ["git", "diff", "--name-only", "HEAD~1"],
-              capture_output=True, text=True
-          ).stdout.strip().split("\n")
-
-          jira_line = ""
-          if jira_key and jira_domain:
-              jira_url = f"https://{jira_domain}/browse/{jira_key}"
-              jira_line = f"**Jira:** [{jira_key}]({jira_url})"
-          elif jira_key:
-              jira_line = f"**Jira:** {jira_key}"
-
-          lines = [
-              "## 🤖 AI-Generated Fix",
-              "",
-              f"**GitHub issue:** #{issue_num}",
-              f"**AI provider:** {ai_label}",
-          ]
-          if jira_line:
-              lines.append(jira_line)
-          lines += [
-              "",
-              "### Analysis",
-              analysis,
-              "",
-              "### Changed Files",
-          ]
-          for f in changed:
-              if f: lines.append(f"- `{f}`")
-
-          lines += [
-              "",
-              "---",
-              f"Fixes #{issue_num}",
-          ]
-          if jira_key:
-              lines.append(f"<!-- jira-key: {jira_key} -->")
-
-          print("\n".join(lines))
-          '
-
           git config --global user.name "AI Issue Fixer"
           git config --global user.email "ai-fixer@github.com"
 
@@ -418,10 +351,32 @@ jobs:
           fi
 
           # Build PR body — embed the Jira key so close-on-merge.yml can find it
-          PR_BODY=$(ISSUE_NUMBER="$ISSUE_NUMBER" JIRA_KEY="$JIRA_KEY" JIRA_DOMAIN="$JIRA_DOMAIN" AI_PROVIDER="$AI_PROVIDER" python3 -c "$PR_BODY_PY")
+          ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")
+          CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | awk 'NF{printf "- `%s`\n", $0}')
+          JIRA_DOMAIN_CLEAN="${JIRA_DOMAIN%/}"
 
-          PR_BODY_JSON=$(echo "$PR_BODY" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
-          PR_TITLE_JSON=$(echo "$PR_TITLE" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read().strip()))")
+          JIRA_LINE=""
+          if [ -n "$JIRA_KEY" ] && [ -n "$JIRA_DOMAIN_CLEAN" ]; then
+            JIRA_LINE="**Jira:** [${JIRA_KEY}](https://${JIRA_DOMAIN_CLEAN}/browse/${JIRA_KEY})"
+          elif [ -n "$JIRA_KEY" ]; then
+            JIRA_LINE="**Jira:** ${JIRA_KEY}"
+          fi
+
+          PR_BODY=$(jq -rn \
+            --arg issue   "$ISSUE_NUMBER" \
+            --arg jira    "$JIRA_LINE" \
+            --arg analysis "$ANALYSIS" \
+            --arg changed  "$CHANGED_FILES" \
+            --arg jira_key "$JIRA_KEY" \
+            '"## 🤖 AI-Generated Fix\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (gpt-4.1)" +
+             (if $jira != "" then "\n" + $jira else "" end) +
+             "\n\n### Analysis\n" + $analysis +
+             "\n\n### Changed Files\n" + $changed +
+             "\n\n---\nFixes #" + $issue +
+             (if $jira_key != "" then "\n<!-- jira-key: " + $jira_key + " -->" else "" end)')
+
+          PR_BODY_JSON=$(printf '%s' "$PR_BODY" | jq -Rs '.')
+          PR_TITLE_JSON=$(printf '%s' "$PR_TITLE" | jq -Rs '.')
 
           PR_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -446,7 +401,7 @@ jobs:
             "$ANALYSIS" \
             "${{ steps.create_pr.outputs.pr_url }}")
 
-          COMMENT_JSON=$(echo "$COMMENT" | python3 -c "import json,sys; print(json.dumps({'body': sys.stdin.read()}))")
+          COMMENT_JSON=$(jq -n --arg body "$COMMENT" '{"body": $body}')
 
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
