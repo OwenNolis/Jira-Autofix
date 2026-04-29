@@ -10,6 +10,34 @@ import IssuesPage from './components/IssuesPage';
 import Settings from './components/Settings';
 import Notifications from './components/Notifications';
 
+// --- ColorPalette component ---
+const COLOR_PALETTE = [
+  { name: 'Blue', value: '#007bff' },
+  { name: 'Green', value: '#4caf50' },
+  { name: 'Orange', value: '#ff9800' },
+  { name: 'Purple', value: '#8e24aa' },
+  { name: 'Red', value: '#e53935' },
+  { name: 'Teal', value: '#00897b' },
+  { name: 'Gray', value: '#23272f' },
+];
+
+function ColorPalette({ currentColor, onChange }: { currentColor: string; onChange: (color: string) => void }) {
+  return (
+    <div className="color-palette-navbar" title="Change navbar color">
+      {COLOR_PALETTE.map((c) => (
+        <button
+          key={c.value}
+          className={`color-palette-swatch${currentColor === c.value ? ' selected' : ''}`}
+          style={{ background: c.value }}
+          aria-label={c.name}
+          onClick={() => onChange(c.value)}
+          type="button"
+        />
+      ))}
+    </div>
+  );
+}
+
 // --- CookieConsentPopup component ---
 function CookieConsentPopup({ open, onAccept }: { open: boolean; onAccept: () => void }) {
   if (!open) return null;
@@ -48,15 +76,17 @@ interface NavigationBarProps {
   toggleAvatarMenu: () => void;
   avatarMenuRef: React.RefObject<HTMLDivElement | null>;
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  navColor: string;
+  setNavColor: (color: string) => void;
 }
 
 // Navigation bar extracted as a component for clarity and reusability
-function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, handleLogout, isAvatarMenuOpen, toggleAvatarMenu, avatarMenuRef, audioRef }: NavigationBarProps) {
+function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, handleLogout, isAvatarMenuOpen, toggleAvatarMenu, avatarMenuRef, audioRef, navColor, setNavColor }: NavigationBarProps) {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="navigation-bar">
+    <nav className="navigation-bar" style={{ backgroundColor: navColor }}>
       <ul className="nav-links">
         <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
         <li><Link to="/map" className={isActive('/map') ? 'active' : ''}>Map</Link></li>
@@ -67,6 +97,8 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
         <li><Link to="/settings" className={isActive('/settings') ? 'active' : ''}>Settings</Link></li>
       </ul>
       <div className="nav-actions">
+        {/* Color palette for navbar color */}
+        <ColorPalette currentColor={navColor} onChange={setNavColor} />
         {/* Dark mode toggle button */}
         <button
           className="dark-mode-toggle"
@@ -112,6 +144,9 @@ function AppContent() {
   const [showCookiePopup, setShowCookiePopup] = useState(() => {
     return isAuthenticated && localStorage.getItem('cookieConsent') !== 'true';
   });
+  const [navColor, setNavColorState] = useState(() => {
+    return localStorage.getItem('navColor') || '#007bff';
+  });
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -135,6 +170,11 @@ function AppContent() {
       setShowCookiePopup(false);
     }
   }, [isAuthenticated]);
+
+  // Update nav color CSS variable
+  useEffect(() => {
+    document.documentElement.style.setProperty('--color-nav', navColor);
+  }, [navColor]);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -181,6 +221,12 @@ function AppContent() {
     setShowCookiePopup(false);
   };
 
+  const setNavColor = (color: string) => {
+    setNavColorState(color);
+    localStorage.setItem('navColor', color);
+    document.documentElement.style.setProperty('--color-nav', color);
+  };
+
   return (
     <div className={`App${isDarkMode ? ' dark' : ''}`}>
       <NavigationBar
@@ -192,6 +238,8 @@ function AppContent() {
         toggleAvatarMenu={toggleAvatarMenu}
         avatarMenuRef={avatarMenuRef}
         audioRef={audioRef}
+        navColor={navColor}
+        setNavColor={setNavColor}
       />
       <CookieConsentPopup open={showCookiePopup} onAccept={handleAcceptCookies} />
       <Routes>
