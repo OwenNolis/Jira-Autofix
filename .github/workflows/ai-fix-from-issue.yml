@@ -345,9 +345,9 @@ jobs:
           # issue title so it doesn't appear twice when we prepend it below
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z]\+-[0-9]\+\][[:space:]]*//')
           if [ -n "$JIRA_KEY" ]; then
-            PR_TITLE="Refs#${JIRA_KEY} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
+            PR_TITLE="Refs:${JIRA_KEY} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
           else
-            PR_TITLE="Refs#GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
+            PR_TITLE="Refs:GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
           fi
 
           # Build PR body — embed the Jira key so close-on-merge.yml can find it
@@ -389,6 +389,8 @@ jobs:
 
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "jira_key=$JIRA_KEY" >> $GITHUB_OUTPUT
+          echo "clean_title=$CLEAN_TITLE" >> $GITHUB_OUTPUT
           echo "✅ PR #${PR_NUMBER} created: $PR_URL"
 
       - name: Comment on issue with PR link
@@ -397,7 +399,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "See PR for details.")
-          COMMENT=$(printf '🤖 **AI Fix Generated**\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed.' \
+          JIRA_KEY="${{ steps.create_pr.outputs.jira_key }}"
+          CLEAN_TITLE="${{ steps.create_pr.outputs.clean_title }}"
+          if [ -n "$JIRA_KEY" ]; then
+            HEADER="🤖 **AI-Generated Fix — Refs#${JIRA_KEY} - ${CLEAN_TITLE}**"
+          else
+            HEADER="🤖 **AI-Generated Fix**"
+          fi
+          COMMENT=$(printf '%s\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed.' \
+            "$HEADER" \
             "$ANALYSIS" \
             "${{ steps.create_pr.outputs.pr_url }}")
 
