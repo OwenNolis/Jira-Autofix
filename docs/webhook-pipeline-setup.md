@@ -35,6 +35,167 @@ This is the current implementation. It uses a **push-based** approach: Jira push
    • Posts a confirmation comment on the PR
 ```
 
+### Detailed Step-by-Step Breakdown
+
+#### Step 1 — Developer adds the `ai-fix` label in Jira
+
+Everything starts in Jira. A developer opens a Jira issue (Bug, Story, Task — any type) and adds the label `ai-fix` to the **Labels** field. Nothing else is needed from the developer at this point. Jira detects the label field change and immediately evaluates the automation rules that are watching for it.
+
+---
+
+#### Step 2 — Jira Automation Rule fires
+
+The rule named **"Jira AI Fix Rule"** is configured with:
+
+- **Trigger:** `Field value changes` on the **Labels** field
+- **Condition:** `Labels contains ai-fix`
+
+When both match, Jira executes two actions in sequence:
+
+##### Action 1 — Send web request to GitHub
+
+Jira POSTs to the [GitHub repository_dispatch API](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event):
+
+```text
+POST https://api.github.com/repos/{owner}/{repo}/dispatches
+```
+
+Headers include `Authorization: Bearer <GitHub PAT>` (a repo-scoped Personal Access Token stored in the Jira rule). The body carries `event_type: "jira-ai-fix"` and a `client_payload` with all the issue fields Jira knows — key, summary, description, priority, type, and status. This is the only outbound call Jira makes. GitHub's response is HTTP 204 (no content) on success.
+
+##### Action 2 — Transition issue to In Progress
+
+Jira moves the issue status to **In Progress** using its own internal transition engine. This happens synchronously right after the webhook fires, so the developer immediately sees the issue move on the board.
+
+---
+
+#### Step 3 — `jira-label-trigger.yml` handles the incoming dispatch
+
+GitHub receives the `repository_dispatch` event and starts the **Jira Label Trigger** workflow. This workflow runs on `ubuntu-latest` and does three things:
+
+##### 3a. Deduplication check
+
+Before creating anything, the workflow queries the GitHub Issues API for any existing issue with the label `jira:JIRAFIX-XX`. If one already exists (e.g. the developer accidentally toggled the label twice), the workflow logs a skip message and exits cleanly — no duplicate issues or AI runs.
+
+##### 3b. Create a GitHub issue
+
+If no existing issue is found, the workflow:
+
+1. Creates a per-issue label `jira:JIRAFIX-XX` (color `#0052CC`, Jira blue) via the GitHub Labels API. If the label already exists the call silently ignores the conflict.
+2. Builds a Markdown issue body using a Python `json.dumps` call (to avoid shell quoting problems) containing:
+   - A hidden HTML comment `<!-- jira-key: JIRAFIX-XX -->` — used by `close-on-merge.yml` later
+   - A header linking back to the Jira issue URL (`https://{JIRA_DOMAIN}/browse/JIRAFIX-XX`)
+   - A table showing Type, Priority, and Status
+   - The full issue description
+3. POSTs to the GitHub Issues API with title `[JIRAFIX-XX] Issue summary`, the body above, and labels: `jira:JIRAFIX-XX`, `from-jira`, `ai-fix`.
+4. Captures the new GitHub issue number from the JSON response.
+
+##### 3c. Dispatch the AI fix workflow
+
+With the GitHub issue number in hand, the workflow POSTs to the GitHub Actions workflow dispatch endpoint:
+
+```text
+POST /repos/{owner}/{repo}/actions/workflows/ai-fix-from-issue.yml/dispatches
+Body: { "ref": "main", "inputs": { "issue_number": "42" } }
+```
+
+This queues `ai-fix-from-issue.yml` immediately. The trigger workflow itself finishes in about 10 seconds.
+
+---
+
+#### Step 4 — `ai-fix-from-issue.yml` generates and applies the fix
+
+This is the longest-running step (2–15 minutes). It is triggered by `workflow_dispatch` with `issue_number` as input.
+
+##### 4a. Read the GitHub issue
+
+The workflow calls the GitHub Issues API to fetch the full issue body for the given `issue_number`. It parses the Jira key from the hidden `<!-- jira-key: -->` comment and uses the issue title and description as the AI prompt context.
+
+##### 4b. Collect source files
+
+The workflow checks out the repository at `main` and recursively finds all files matching:
+
+- `.ts`, `.tsx`, `.js`, `.jsx` — TypeScript and JavaScript source
+- `.css`, `.scss` — stylesheets
+- All `package.json` files (to give the AI awareness of dependencies and scripts)
+
+Each file's path and content are bundled into a single prompt payload.
+
+##### 4c. Call GitHub Copilot CLI
+
+The entire prompt (issue title + description + all file contents) is sent to the GitHub Copilot CLI using the `COPILOT_PAT` secret. The prompt instructs Copilot to respond **only** with a JSON object in this shape:
+
+```json
+{ "files": [{ "path": "src/foo.ts", "content": "..." }, ...] }
+```
+
+Copilot reads the codebase context and the issue requirements and produces the minimal set of file changes it believes will resolve the issue.
+
+##### 4d. Apply the changes
+
+The workflow iterates over the `files` array in the Copilot response. For each entry it writes `content` to `path`, creating new files or overwriting existing ones. Any file not listed in the response is left untouched.
+
+##### 4e. Verify the build
+
+`npm run build` is executed. If it exits non-zero:
+
+- The workflow posts a comment on the GitHub issue containing the build error output.
+- The workflow exits without creating a PR.
+- The developer can update the Jira issue description and re-add the `ai-fix` label to retry.
+
+##### 4f. Create the Pull Request
+
+If the build passes, the workflow commits the changes and opens a PR:
+
+- **Branch:** `ai-fix/issue-JIRAFIX-XX-TIMESTAMP`
+- **Title:** `Refs#JIRAFIX-XX - Issue Summary (Closes #42)`
+- **Body:** Contains `Fixes #42` (auto-closes the GitHub issue on merge) and `<!-- jira-key: JIRAFIX-XX -->` (used by `close-on-merge.yml`)
+
+A comment is posted on the GitHub issue with a direct link to the PR.
+
+---
+
+#### Step 5 — Developer reviews and merges the PR
+
+The developer reviews the AI-generated diff on GitHub. If changes are acceptable, the PR is merged into `main`. GitHub's built-in behavior fires:
+
+- The linked GitHub issue (#42) is **automatically closed** by the `Fixes #42` reference in the PR body.
+
+---
+
+#### Step 6 — `close-on-merge.yml` closes the Jira issue
+
+The workflow is triggered by `pull_request: [closed]` and only runs when `github.event.pull_request.merged == true`.
+
+##### 6a. Extract the Jira key
+
+The PR body is scanned for the pattern `<!-- jira-key: (.*) -->`. The captured group gives the Jira issue key (e.g. `JIRAFIX-42`).
+
+##### 6b. Get an OAuth token
+
+The workflow POSTs to the Gravitee gateway token endpoint (`SDLC_INTERNSHIP_TOKEN_ENDPOINT`) using the client-credentials grant:
+
+```text
+POST {token_endpoint}
+Body: grant_type=client_credentials&client_id=...&client_secret=...
+```
+
+The gateway returns a short-lived bearer token.
+
+##### 6c. Call the Jira transitions API
+
+Using the bearer token, the workflow calls Jira's REST API via the gateway:
+
+```text
+POST {SDLC_INTERNSHIP_JIRA_BASE_ENDPOINT}/issue/JIRAFIX-42/transitions
+Body: { "transition": { "id": "<closed-transition-id>" } }
+```
+
+The Jira issue moves to **Closed**.
+
+##### 6d. Post a confirmation comment on the PR
+
+A comment is added to the merged PR confirming the Jira issue has been closed, including a link to the Jira issue for traceability.
+
 ---
 
 ## Required GitHub Secrets
@@ -42,7 +203,7 @@ This is the current implementation. It uses a **push-based** approach: Jira push
 Go to **Settings → Secrets and variables → Actions → Secrets**:
 
 | Secret | Description | Required for |
-|--------|-------------|--------------|
+| ------ | ----------- | ------------ |
 | `COPILOT_PAT` | GitHub Personal Access Token with Copilot access | AI fix step |
 | `GATEWAY_CLIENT_ID` | Gravitee gateway OAuth client ID | Closing Jira issue on merge |
 | `GATEWAY_CLIENT_SECRET` | Gravitee gateway OAuth client secret | Closing Jira issue on merge |
@@ -56,7 +217,7 @@ Go to **Settings → Secrets and variables → Actions → Secrets**:
 Go to **Settings → Secrets and variables → Actions → Variables**:
 
 | Variable | Description | Required for |
-|----------|-------------|--------------|
+| -------- | ----------- | ------------ |
 | `JIRA_DOMAIN` | Your Jira domain, e.g. `mycompany.atlassian.net` | PR/issue links |
 | `SDLC_INTERNSHIP_TOKEN_ENDPOINT` | OAuth token endpoint URL on the Gravitee gateway | Closing Jira issue on merge |
 | `SDLC_INTERNSHIP_JIRA_BASE_ENDPOINT` | Jira base REST API URL via gateway, e.g. `https://gateway.example.com/jira/rest/api/2` | Closing Jira issue on merge |
@@ -80,12 +241,15 @@ This is configured entirely inside Jira. No Jira API credentials are needed on t
    - **URL:** `https://api.github.com/repos/{your-org}/{your-repo}/dispatches`
    - **Method:** `POST`
    - **Headers:**
-     ```
+
+     ```text
      Content-Type: application/json
      Accept: application/vnd.github+json
      Authorization: Bearer YOUR_GITHUB_PAT
      ```
+
    - **Body:**
+
      ```json
      {
        "event_type": "jira-ai-fix",
@@ -99,11 +263,13 @@ This is configured entirely inside Jira. No Jira API credentials are needed on t
        }
      }
      ```
+
      > **Important:** If the issue summary contains double quotes or special characters, the JSON will break. Keep summaries free of quotes, or simplify the body to just `"issue_key": "{{issue.key}}"` and remove the other fields (the GitHub issue will then just link to Jira for context).
 5. **Action 2:** `And: Transition the work item to` → **In Progress**
 6. **Save and enable the rule**
 
 **GitHub PAT requirements for the Authorization header:**
+
 - Go to **GitHub → Settings → Developer settings → Personal access tokens**
 - Create a token with scopes: `repo` (full) — this allows triggering `repository_dispatch`
 
