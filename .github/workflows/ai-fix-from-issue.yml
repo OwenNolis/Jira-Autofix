@@ -368,7 +368,9 @@ jobs:
             --arg analysis "$ANALYSIS" \
             --arg changed  "$CHANGED_FILES" \
             --arg jira_key "$JIRA_KEY" \
-            '"## 🤖 AI-Generated Fix\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (gpt-4.1)" +
+            --arg title   "$CLEAN_TITLE" \
+            '(if $jira_key != "" then "## 🤖 AI-Generated Fix — Refs#" + $jira_key + " - " + $title else "## 🤖 AI-Generated Fix" end) +
+             "\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (gpt-4.1)" +
              (if $jira != "" then "\n" + $jira else "" end) +
              "\n\n### Analysis\n" + $analysis +
              "\n\n### Changed Files\n" + $changed +
@@ -402,7 +404,7 @@ jobs:
           JIRA_KEY="${{ steps.create_pr.outputs.jira_key }}"
           CLEAN_TITLE="${{ steps.create_pr.outputs.clean_title }}"
           if [ -n "$JIRA_KEY" ]; then
-            HEADER="🤖 **AI-Generated Fix — Refs#${JIRA_KEY} - ${CLEAN_TITLE}**"
+            HEADER="🤖 **AI-Generated Fix — Refs:${JIRA_KEY} - ${CLEAN_TITLE}**"
           else
             HEADER="🤖 **AI-Generated Fix**"
           fi
