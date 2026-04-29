@@ -12,13 +12,13 @@ import Notifications from './components/Notifications';
 
 // Sun and Moon SVG icons
 const SunIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" fill="none"/>
     <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2"/>
   </svg>
 );
 const MoonIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M21 12.79A9 9 0 0111.21 3c0 .34.02.68.05 1.01A7 7 0 1012 21a9 9 0 009-8.21z" stroke="currentColor" strokeWidth="2" fill="none"/>
   </svg>
 );
