@@ -10,6 +10,22 @@ import IssuesPage from './components/IssuesPage';
 import Settings from './components/Settings';
 import Notifications from './components/Notifications';
 
+// --- CookieConsentPopup component ---
+function CookieConsentPopup({ open, onAccept }: { open: boolean; onAccept: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="cookie-popup-overlay">
+      <div className="cookie-popup">
+        <div className="cookie-popup-title">Cookie Consent</div>
+        <div className="cookie-popup-message">
+          This site uses cookies to enhance your experience. By continuing to use the application, you agree to our use of cookies.
+        </div>
+        <button className="cookie-popup-btn" onClick={onAccept} autoFocus>Accept</button>
+      </div>
+    </div>
+  );
+}
+
 // Sun and Moon SVG icons
 const SunIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -93,6 +109,9 @@ function AppContent() {
     return localStorage.getItem('isAuthenticated') === 'true';
   });
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const [showCookiePopup, setShowCookiePopup] = useState(() => {
+    return isAuthenticated && localStorage.getItem('cookieConsent') !== 'true';
+  });
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -107,6 +126,15 @@ function AppContent() {
       document.body.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Show cookie popup after login if not already accepted
+  useEffect(() => {
+    if (isAuthenticated && localStorage.getItem('cookieConsent') !== 'true') {
+      setShowCookiePopup(true);
+    } else {
+      setShowCookiePopup(false);
+    }
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -148,6 +176,11 @@ function AppContent() {
     });
   };
 
+  const handleAcceptCookies = () => {
+    localStorage.setItem('cookieConsent', 'true');
+    setShowCookiePopup(false);
+  };
+
   return (
     <div className={`App${isDarkMode ? ' dark' : ''}`}>
       <NavigationBar
@@ -160,6 +193,7 @@ function AppContent() {
         avatarMenuRef={avatarMenuRef}
         audioRef={audioRef}
       />
+      <CookieConsentPopup open={showCookiePopup} onAccept={handleAcceptCookies} />
       <Routes>
         <Route
           path="/login"
