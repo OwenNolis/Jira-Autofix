@@ -29,6 +29,84 @@
   --color-jira-type-story: #4caf50;
 }
 
+/* --- Toast Notification Styles --- */
+.toast-container {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  pointer-events: none;
+}
+.toast {
+  min-width: 240px;
+  max-width: 340px;
+  background: #fff;
+  color: #222;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.13);
+  padding: 16px 38px 16px 18px;
+  font-size: 1.05rem;
+  font-weight: 500;
+  border-left: 6px solid #007bff;
+  position: relative;
+  animation: toast-fadein 0.18s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.toast-success {
+  border-left-color: var(--color-status-success);
+}
+.toast-error {
+  border-left-color: var(--color-status-failure);
+}
+.toast-info {
+  border-left-color: var(--color-nav);
+}
+.toast-warning {
+  border-left-color: var(--color-status-inprogress);
+}
+.toast-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  pointer-events: auto;
+  transition: color 0.18s;
+}
+.toast-close:hover {
+  color: #d32f2f;
+}
+@keyframes toast-fadein {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+  .toast-container {
+    top: 8px;
+    right: 4px;
+    left: 4px;
+    max-width: 98vw;
+    align-items: flex-end;
+  }
+  .toast {
+    min-width: 90vw;
+    max-width: 98vw;
+    padding: 12px 32px 12px 12px;
+    font-size: 0.98rem;
+  }
+}
+
 .App {
   background: var(--color-bg);
   color: var(--color-text);
