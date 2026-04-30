@@ -40,12 +40,19 @@ jobs:
           echo "Received Jira issue: $ISSUE_KEY — $SUMMARY"
 
           # Skip if a GitHub issue already exists for this Jira key
-          EXISTING=$(curl -s \
+          EXISTING_RESPONSE_FILE=$(mktemp)
+          EXISTING_STATUS=$(curl -s -o "$EXISTING_RESPONSE_FILE" -w "%{http_code}" \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues?labels=jira:${ISSUE_KEY}&state=all" \
-            | jq 'length')
+            "https://api.github.com/repos/${{ github.repository }}/issues?labels=jira:${ISSUE_KEY}&state=all")
 
+          if [ "$EXISTING_STATUS" != "200" ]; then
+            echo "⚠️  GitHub API returned HTTP $EXISTING_STATUS when checking for existing issues — aborting to avoid duplicates"
+            echo "gh_number=" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          EXISTING=$(jq 'if type == "array" then length else 0 end' "$EXISTING_RESPONSE_FILE")
           if [ "$EXISTING" -gt 0 ]; then
             echo "⏭️  GitHub issue already exists for $ISSUE_KEY — skipping"
             echo "gh_number=" >> $GITHUB_OUTPUT
