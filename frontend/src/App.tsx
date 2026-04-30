@@ -93,6 +93,28 @@ function ColorPalette({ currentColor, onChange }: { currentColor: string; onChan
   );
 }
 
+// --- ClockWidget component ---
+function ClockWidget() {
+  const [time, setTime] = useState(() => {
+    const now = new Date();
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="navbar-clock-widget" title="Current time" aria-label="Current time">
+      {time}
+    </div>
+  );
+}
+
 // --- CookieConsentPopup component ---
 function CookieConsentPopup({ open, onAccept }: { open: boolean; onAccept: () => void }) {
   if (!open) return null;
@@ -152,6 +174,8 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
         <li><Link to="/settings" className={isActive('/settings') ? 'active' : ''}>Settings</Link></li>
       </ul>
       <div className="nav-actions">
+        {/* Clock widget */}
+        <ClockWidget />
         {/* Color palette for navbar color */}
         <ColorPalette currentColor={navColor} onChange={setNavColor} />
         {/* Dark mode toggle button */}

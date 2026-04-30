@@ -114,6 +114,30 @@
   transition: background 0.2s, color 0.2s;
 }
 
+/* --- Clock Widget Styles --- */
+.navbar-clock-widget {
+  color: #fff;
+  background: rgba(0,0,0,0.10);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 1.08rem;
+  font-weight: 600;
+  margin-right: 10px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+  display: flex;
+  align-items: center;
+  height: 28px;
+  min-width: 80px;
+  justify-content: center;
+  user-select: none;
+  transition: background 0.2s, color 0.2s;
+}
+.App.dark .navbar-clock-widget, body.dark .navbar-clock-widget {
+  color: #ffd700;
+  background: rgba(255,255,255,0.08);
+}
+
 /* --- Color Palette Styles --- */
 .color-palette-navbar {
   display: flex;
