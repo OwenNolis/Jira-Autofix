@@ -14,7 +14,6 @@ jobs:
     permissions:
       issues: write
       contents: read
-      actions: write
 
     steps:
       - name: Check dependencies
