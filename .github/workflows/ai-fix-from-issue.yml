@@ -233,6 +233,13 @@ jobs:
           while IFS= read -r entry; do
             PATH_VAL=$(printf '%s' "$entry" | jq -r '.path // "" | ltrimstr(" ") | rtrimstr(" ")')
             [ -z "$PATH_VAL" ] && continue
+
+            case "$PATH_VAL" in
+              /*|../*|*/../*|*/..| ..|.git|.git/*|.github/workflows|.github/workflows/*)
+                echo "Skipping unsafe path: $PATH_VAL"
+                continue
+                ;;
+            esac
             mkdir -p "$(dirname "$PATH_VAL")"
             printf '%s' "$entry" | jq -rj '.content // ""' > "$PATH_VAL"
             echo "Wrote: $PATH_VAL"
