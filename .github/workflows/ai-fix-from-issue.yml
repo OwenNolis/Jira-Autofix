@@ -1,4 +1,4 @@
-# Triggered when a GitHub issue is opened, gets the ai-fix label, someone comments !fix, or dispatched directly with an issue number.
+# Triggered when a GitHub issue is opened, gets the ai-fix label, someone comments /fix-ai, or dispatched directly with an issue number.
 
 name: AI Fix from GitHub Issue
 
@@ -25,7 +25,7 @@ jobs:
     #   • Dispatched directly with an issue number, OR
     #   • An issue is opened, OR
     #   • An issue was labeled with "ai-fix", OR
-    #   • A comment starts with "!fix" on a real issue (not a PR)
+    #   • A comment starts with "/fix-ai" on a real issue (not a PR)
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.action == 'opened') ||
