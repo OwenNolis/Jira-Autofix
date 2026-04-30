@@ -10,7 +10,7 @@ on:
 
 jobs:
   close-jira:
-    if: github.event.pull_request.merged == true
+    if: false
     runs-on: ubuntu-latest
     permissions:
       issues: write
