@@ -10,6 +10,61 @@ import IssuesPage from './components/IssuesPage';
 import Settings from './components/Settings';
 import Notifications from './components/Notifications';
 
+// --- Toast Notification System ---
+interface Toast {
+  id: number;
+  type: 'success' | 'error' | 'info' | 'warning';
+  message: string;
+  duration?: number; // ms
+}
+
+const ToastContext = React.createContext<{
+  showToast: (message: string, type?: Toast['type'], duration?: number) => void;
+} | undefined>(undefined);
+
+function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastId = useRef(0);
+
+  const showToast = (message: string, type: Toast['type'] = 'info', duration = 3500) => {
+    const id = ++toastId.current;
+    setToasts((prev) => [...prev, { id, type, message, duration }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, duration);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  return (
+    <ToastContext.Provider value={{ showToast }}>
+      {children}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`toast toast-${toast.type}`}
+            role="alert"
+            tabIndex={0}
+            onClick={() => removeToast(toast.id)}
+          >
+            {toast.message}
+            <button className="toast-close" aria-label="Close" onClick={() => removeToast(toast.id)}>&times;</button>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const ctx = React.useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used within ToastProvider');
+  return ctx;
+}
+
 // --- ColorPalette component ---
 const COLOR_PALETTE = [
   { name: 'Blue', value: '#007bff' },
@@ -152,6 +207,9 @@ function AppContent() {
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Toast context
+  const { showToast } = useToast();
+
   // Apply dark mode class to root div
   useEffect(() => {
     // This effect is for body-level styling if needed
@@ -179,7 +237,7 @@ function AppContent() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('isAuthenticated');
-    alert('You have been logged out.');
+    showToast('You have been logged out.', 'info');
     navigate('/login');
   };
 
@@ -212,6 +270,7 @@ function AppContent() {
   const handleToggleDarkMode = () => {
     setIsDarkMode((prev) => {
       localStorage.setItem('darkMode', String(!prev));
+      showToast(`Switched to ${!prev ? 'dark' : 'light'} mode.`, 'info');
       return !prev;
     });
   };
@@ -219,12 +278,14 @@ function AppContent() {
   const handleAcceptCookies = () => {
     localStorage.setItem('cookieConsent', 'true');
     setShowCookiePopup(false);
+    showToast('Cookie consent accepted.', 'success');
   };
 
   const setNavColor = (color: string) => {
     setNavColorState(color);
     localStorage.setItem('navColor', color);
     document.documentElement.style.setProperty('--color-nav', color);
+    showToast('Navbar color updated.', 'info');
   };
 
   return (
@@ -245,7 +306,10 @@ function AppContent() {
       <Routes>
         <Route
           path="/login"
-          element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={() => setIsAuthenticated(true)} />}
+          element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={() => {
+            setIsAuthenticated(true);
+            showToast('Login successful!', 'success');
+          }} />}
         />
         <Route
           path="/about"
@@ -293,9 +357,11 @@ function AppContent() {
 // Outer shell — only responsible for providing the Router context
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <ToastProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </ToastProvider>
   );
 }
 
