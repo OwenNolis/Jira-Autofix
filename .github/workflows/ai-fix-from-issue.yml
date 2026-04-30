@@ -287,7 +287,13 @@ jobs:
           ISSUE_NUMBER: ${{ steps.resolve.outputs.number }}
         run: |
           cd frontend
-          npm install --legacy-peer-deps 2>&1 | tail -5
+          if npm install --legacy-peer-deps > /tmp/npm-install.log 2>&1; then
+            tail -5 /tmp/npm-install.log
+          else
+            echo "❌ npm install failed"
+            tail -5 /tmp/npm-install.log
+            exit 1
+          fi
 
           # Run the build and capture output
           if npm run build 2>&1 | tee /tmp/build-output.log; then
