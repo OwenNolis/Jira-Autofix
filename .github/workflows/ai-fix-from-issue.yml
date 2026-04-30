@@ -421,7 +421,7 @@ jobs:
           else
             HEADER="🤖 **AI-Generated Fix**"
           fi
-          COMMENT=$(printf '%s\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed.' \
+          COMMENT=$(printf '%s\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed. (Only if close-on-merge workflow gets added with needed credentials)' \
             "$HEADER" \
             "$ANALYSIS" \
             "${{ steps.create_pr.outputs.pr_url }}")
