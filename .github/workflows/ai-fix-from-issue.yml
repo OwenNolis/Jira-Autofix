@@ -363,7 +363,7 @@ jobs:
             PR_TITLE="Refs:GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
           fi
 
-          # Build PR body — embed the Jira key so close-on-merge.yml can find it
+          # Build PR body — embed the Jira key so the later used workflow close-on-merge.yml/downstream automation can find it
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")
           CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | awk 'NF{printf "- `%s`\n", $0}')
           JIRA_DOMAIN_CLEAN="${JIRA_DOMAIN%/}"
