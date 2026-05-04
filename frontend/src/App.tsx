@@ -172,6 +172,34 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
         <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link></li>
         <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link></li>
         <li><Link to="/settings" className={isActive('/settings') ? 'active' : ''}>Settings</Link></li>
+        <li>
+          {/* CSBOV7-398: Add link to Jira issue */}
+          <a
+            href="https://agentic-ai-sdlc.atlassian.net/browse/CSBOV7-398"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="jira-link-nav"
+            style={{
+              color: '#fff',
+              background: '#0052CC',
+              borderRadius: 4,
+              padding: '3px 7px',
+              fontWeight: 600,
+              fontSize: 15,
+              marginLeft: 6,
+              textDecoration: 'none',
+              display: 'inline-block',
+              letterSpacing: '-0.5px',
+              height: 28,
+              lineHeight: '22px',
+              verticalAlign: 'middle',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+            title="View Jira Issue CSBOV7-398"
+          >
+            Jira: CSBOV7-398
+          </a>
+        </li>
       </ul>
       <div className="nav-actions">
         {/* Clock widget */}
