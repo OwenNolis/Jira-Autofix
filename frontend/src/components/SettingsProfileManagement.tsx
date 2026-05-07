@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import './Settings.css';
 
+function SaveIcon() {
+  return (
+    <svg className="save-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="14" height="14" rx="3" fill="currentColor" opacity="0.13"/>
+      <path d="M6 10.5L9 13.5L14 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 function ProfileManagement() {
   // Demo: hardcoded user info, editable
   const [profile, setProfile] = useState({
@@ -119,18 +128,15 @@ function ProfileManagement() {
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
             <button
               type="submit"
+              className="primary-save-btn"
               style={{
-                padding: '8px 22px',
-                borderRadius: 6,
-                border: 'none',
-                background: 'var(--color-button-bg)',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: '1.05rem',
-                cursor: 'pointer',
-                transition: 'background 0.2s',
+                // Remove background, color, etc. to use .primary-save-btn
+                // Only add margin if needed
               }}
-            >Save</button>
+            >
+              <SaveIcon />
+              Save Changes
+            </button>
             <button
               type="button"
               style={{
