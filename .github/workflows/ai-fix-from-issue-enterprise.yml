@@ -110,7 +110,7 @@ jobs:
           # Embed COMPLETE source file contents + package.json so AI knows
           # exactly what packages are installed and can add new ones if needed
           true > /tmp/file_contents.txt
-          
+
           # Always include package.json files first
           for pkgjson in $(git ls-files | grep 'package\.json' | grep -v node_modules); do
             [ -f "$pkgjson" ] || continue
@@ -118,14 +118,55 @@ jobs:
             cat "$pkgjson"                           >> /tmp/file_contents.txt
             printf '\n```\n\n'                       >> /tmp/file_contents.txt
           done
-          
-          # Then all source files
-          for file in $(git ls-files | grep -E '\.(ts|tsx|js|jsx|css|scss)$' | head -30); do
+
+          # Extract keywords from the issue title and body (lowercase words, 4+ chars)
+          KEYWORDS=$(printf '%s\n%s' "$ISSUE_TITLE" "$ISSUE_BODY" \
+            | tr '[:upper:]' '[:lower:]' \
+            | grep -oE '[a-z]{4,}' \
+            | grep -vE '^(this|that|with|from|have|will|been|were|they|them|then|when|your|also|into|more|over|such|some|than|only|each|which|their|there|these|those|about|after|would|could|should|issue|jira|github|field|value|table|type|status|priority)$' \
+            | sort -u)
+
+          # Include keyword-matched files first (up to 20), then fill remaining slots
+          true > /tmp/matched_files.txt
+          true > /tmp/other_files.txt
+
+          while IFS= read -r file; do
+            [ -f "$file" ] || continue
+            FILENAME=$(basename "$file" | tr '[:upper:]' '[:lower:]' | sed 's/\.[^.]*$//')
+            MATCHED=false
+            while IFS= read -r kw; do
+              [ -z "$kw" ] && continue
+              if echo "$FILENAME" | grep -q "$kw"; then
+                MATCHED=true
+                break
+              fi
+            done <<< "$KEYWORDS"
+            if [ "$MATCHED" = true ]; then
+              echo "$file" >> /tmp/matched_files.txt
+            else
+              echo "$file" >> /tmp/other_files.txt
+            fi
+          done < <(git ls-files | grep -E '\.(ts|tsx|js|jsx|css|scss)$')
+
+          # Write matched files first, then fill up to 30 total with others
+          INCLUDED=0
+          while IFS= read -r file && [ "$INCLUDED" -lt 20 ]; do
             [ -f "$file" ] || continue
             printf '### FILE: %s\n```\n' "$file" >> /tmp/file_contents.txt
             cat "$file"                          >> /tmp/file_contents.txt
             printf '\n```\n\n'                   >> /tmp/file_contents.txt
-          done
+            INCLUDED=$((INCLUDED + 1))
+          done < /tmp/matched_files.txt
+
+          while IFS= read -r file && [ "$INCLUDED" -lt 30 ]; do
+            [ -f "$file" ] || continue
+            printf '### FILE: %s\n```\n' "$file" >> /tmp/file_contents.txt
+            cat "$file"                          >> /tmp/file_contents.txt
+            printf '\n```\n\n'                   >> /tmp/file_contents.txt
+            INCLUDED=$((INCLUDED + 1))
+          done < /tmp/other_files.txt
+
+          echo "Keyword-matched files: $(wc -l < /tmp/matched_files.txt | tr -d ' '), total included: $INCLUDED"
           
           FILE_CONTENTS=$(cat /tmp/file_contents.txt)
 
