@@ -416,18 +416,18 @@ jobs:
           git add -A
           
           # Commit — include "Fixes #N" so GitHub auto-closes the issue on merge
+          COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
+          SCOPE="${{ steps.apply_changes.outputs.scope }}"
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated code changes")
           COMMIT_BODY="Fixes #${ISSUE_NUMBER}"
           [ -n "$JIRA_KEY" ] && COMMIT_BODY=$(printf '%s\nJira: %s' "$COMMIT_BODY" "$JIRA_KEY")
-          COMMIT_MSG=$(printf 'fix: AI-generated fix for issue #%s\n\n%s\n\n%s' \
-            "$ISSUE_NUMBER" "$ANALYSIS" "$COMMIT_BODY")
+          COMMIT_MSG=$(printf '%s: AI-generated fix for issue #%s\n\n%s\n\n%s' \
+            "$COMMIT_TYPE" "$ISSUE_NUMBER" "$ANALYSIS" "$COMMIT_BODY")
           git commit -m "$COMMIT_MSG"
-          
+
           git push origin "$BRANCH"
-          
+
           # Build PR title using conventional commit format
-          COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
-          SCOPE="${{ steps.apply_changes.outputs.scope }}"
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
           PR_TITLE="${COMMIT_TYPE}(${SCOPE}): ${JIRA_KEY} - ${CLEAN_TITLE}"
           
