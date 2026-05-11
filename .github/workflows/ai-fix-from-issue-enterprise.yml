@@ -155,18 +155,18 @@ jobs:
           true > /tmp/matched_files.txt
           true > /tmp/other_files.txt
 
+          # Build a single grep pattern from all keywords (e.g. "shipment|reference|cell")
+          # This replaces the slow nested loop with one grep call per file list
+          if [ -n "$KEYWORDS" ]; then
+            KEYWORD_PATTERN=$(echo "$KEYWORDS" | tr '\n' '|' | sed 's/|$//')
+          else
+            KEYWORD_PATTERN=""
+          fi
+
           while IFS= read -r file; do
             [ -f "$file" ] || continue
             FILENAME=$(basename "$file" | tr '[:upper:]' '[:lower:]' | sed 's/\.[^.]*$//')
-            MATCHED=false
-            while IFS= read -r kw; do
-              [ -z "$kw" ] && continue
-              if echo "$FILENAME" | grep -q "$kw"; then
-                MATCHED=true
-                break
-              fi
-            done <<< "$KEYWORDS"
-            if [ "$MATCHED" = true ]; then
+            if [ -n "$KEYWORD_PATTERN" ] && echo "$FILENAME" | grep -qE "$KEYWORD_PATTERN"; then
               echo "$file" >> /tmp/matched_files.txt
             else
               echo "$file" >> /tmp/other_files.txt
