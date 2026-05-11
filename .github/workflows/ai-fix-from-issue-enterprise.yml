@@ -129,6 +129,10 @@ jobs:
           
           FILE_CONTENTS=$(cat /tmp/file_contents.txt)
 
+          # Find real example file paths from the repo for the prompt
+          EXAMPLE_TS=$(git ls-files | grep -E '\.(tsx|ts)$' | grep -v node_modules | head -1 || echo "src/index.ts")
+          EXAMPLE_CSS=$(git ls-files | grep -E '\.css$' | grep -v node_modules | head -1 || echo "src/index.css")
+
           {
             echo "You are an expert software engineer. Your task is to write code changes that fix a Jira issue."
             echo ""
@@ -159,9 +163,17 @@ jobs:
             echo "## REQUIRED OUTPUT FORMAT"
             echo "Respond with ONLY a JSON object — no explanation, no markdown fences around the JSON itself:"
             echo ""
-            echo '{"files": [{"path": "src/App.tsx", "content": "// full file content here"}, {"path": "src/App.css", "content": "/* full file content */"}]}'
+            echo "{\"type\": \"fix\", \"files\": [{\"path\": \"${EXAMPLE_TS}\", \"content\": \"// full file content here\"}, {\"path\": \"${EXAMPLE_CSS}\", \"content\": \"/* full file content */\"}]}"
             echo ""
             echo "Rules for the JSON:"
+            echo "- 'type': conventional commit type based on the nature of your changes:"
+            echo "    fix      — bug fix or correcting broken behaviour"
+            echo "    feat     — new feature or new capability added"
+            echo "    refactor — code restructure with no behaviour change"
+            echo "    style    — formatting, whitespace, or CSS-only changes"
+            echo "    chore    — config, tooling, or dependency updates"
+            echo "    docs     — documentation only"
+            echo "    test     — adding or updating tests"
             echo "- 'path': relative path from repo root (e.g. src/App.tsx)"
             echo "- 'content': the COMPLETE updated file — not a diff, not a snippet, the whole file"
             echo "- Only include files you actually changed"
