@@ -265,6 +265,14 @@ jobs:
           fi
           echo "Total files written: $FILE_COUNT"
 
+          COMMIT_TYPE=$(printf '%s' "$JSON" | jq -r '.type // "fix"')
+          # Validate — fall back to "fix" if the AI returns something unexpected
+          case "$COMMIT_TYPE" in
+            fix|feat|refactor|style|chore|docs|test) ;;
+            *) COMMIT_TYPE="fix" ;;
+          esac
+          echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
+
       - name: Check for changes
         id: check_changes
         run: |
