@@ -362,6 +362,7 @@ jobs:
              "\n\n### Analysis\n" + $analysis +
              "\n\n### Changed Files\n" + $changed +
              "\n\n---\nFixes #" + $issue +
+             (if $jira_key != "" then "\nRefs: " + $jira_key else "" end) +
              (if $jira_key != "" then "\n<!-- jira-key: " + $jira_key + " -->" else "" end)')
           
           PR_BODY_JSON=$(printf '%s' "$PR_BODY" | jq -Rs '.')
