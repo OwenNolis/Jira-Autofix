@@ -1,0 +1,405 @@
+# Triggered when a GitHub issue is opened, gets the ai-fix label, someone comments /fix-ai, or dispatched directly with an issue number.
+
+name: AI Fix from GitHub Issue
+
+on:
+  issues:
+    types: [ opened, labeled ]
+  issue_comment:
+    types: [ created ]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'GitHub issue number to fix'
+        required: true
+
+concurrency:
+  group: ai-fix-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  ai-fix:
+    runs-on: ubuntu-latest
+
+    # Run when:
+    #   • Dispatched directly with an issue number, OR
+    #   • An issue is opened, OR
+    #   • An issue was labeled with "ai-fix", OR
+    #   • A comment starts with "/fix-ai" on a real issue (not a PR)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.action == 'opened') ||
+      (github.event_name == 'issues' && github.event.label.name == 'ai-fix') ||
+      (github.event_name == 'issue_comment' &&
+       startsWith(github.event.comment.body, '/fix-ai') &&
+       !github.event.issue.pull_request)
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      models: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Check dependencies
+        run: |
+          if ! command -v jq &>/dev/null; then
+            echo "jq not found, installing..."
+            sudo apt-get install -y -qq jq
+          fi
+          jq --version
+
+      - name: Resolve issue number and title
+        id: resolve
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            NUMBER="${{ github.event.inputs.issue_number }}"
+          else
+            NUMBER="${{ github.event.issue.number }}"
+          fi
+          
+          TITLE=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${NUMBER}" \
+            | jq -r '.title // "Untitled"')
+          
+          echo "number=$NUMBER" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: Acknowledge trigger (add 👀 reaction)
+        if: github.event_name == 'issue_comment'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -d '{"content":"eyes"}' > /dev/null
+
+      - name: Build Copilot prompt from GitHub issue
+        id: build_prompt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER="${{ steps.resolve.outputs.number }}"
+          
+          # Fetch full issue details
+          ISSUE_JSON=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}")
+          
+          ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title // "Untitled"')
+          ISSUE_BODY=$(echo "$ISSUE_JSON"  | jq -r '.body  // "No description."')
+          
+          # Build repository file tree
+          FILE_TREE=$(git ls-files \
+            | grep -E '\.(ts|tsx|js|jsx|css|scss|html|json)$' \
+            | sort | head -100)
+          
+          # Embed COMPLETE source file contents + package.json so AI knows
+          # exactly what packages are installed and can add new ones if needed
+          true > /tmp/file_contents.txt
+          
+          # Always include package.json files first
+          for pkgjson in $(git ls-files | grep 'package\.json' | grep -v node_modules); do
+            [ -f "$pkgjson" ] || continue
+            printf '### FILE: %s\n```\n' "$pkgjson" >> /tmp/file_contents.txt
+            cat "$pkgjson"                           >> /tmp/file_contents.txt
+            printf '\n```\n\n'                       >> /tmp/file_contents.txt
+          done
+          
+          # Then all source files
+          for file in $(git ls-files | grep -E '\.(ts|tsx|js|jsx|css|scss)$' | head -30); do
+            [ -f "$file" ] || continue
+            printf '### FILE: %s\n```\n' "$file" >> /tmp/file_contents.txt
+            cat "$file"                          >> /tmp/file_contents.txt
+            printf '\n```\n\n'                   >> /tmp/file_contents.txt
+          done
+          
+          FILE_CONTENTS=$(cat /tmp/file_contents.txt)
+
+          {
+            echo "You are an expert software engineer. Your task is to write code changes that fix a Jira issue."
+            echo ""
+            echo "Repository: ${{ github.repository }}"
+            echo "Jira/GitHub Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+            echo ""
+            echo "## Issue Description"
+            echo "${ISSUE_BODY}"
+            echo ""
+            echo "## Repository File Tree"
+            printf '```\n%s\n```\n' "${FILE_TREE}"
+            echo ""
+            echo "## Current Source Files (COMPLETE contents)"
+            echo "${FILE_CONTENTS}"
+            echo ""
+            echo "## Your Task"
+            echo "Write the actual code changes needed to fix the issue described above."
+            echo "- Preserve ALL existing functionality — do not remove or break any existing features."
+            echo "- Only add or modify what is needed to implement the fix."
+            echo "- Follow the existing code style and naming conventions."
+            echo "- If you create a new component, also import and use it in the relevant parent file."
+            echo "- If you need an npm package that is NOT already in package.json, add it to the"
+            echo "  'dependencies' section of frontend/package.json with an appropriate version."
+            echo "- IMPORTANT: Never import a package that is not listed in package.json."
+            echo "- IMPORTANT: When using third-party CSS that references local image files (e.g. leaflet),"
+            echo "  do NOT import it via JS/TS. Instead add a CDN <link> tag to frontend/public/index.html."
+            echo ""
+            echo "## REQUIRED OUTPUT FORMAT"
+            echo "Respond with ONLY a JSON object — no explanation, no markdown fences around the JSON itself:"
+            echo ""
+            echo '{"files": [{"path": "src/App.tsx", "content": "// full file content here"}, {"path": "src/App.css", "content": "/* full file content */"}]}'
+            echo ""
+            echo "Rules for the JSON:"
+            echo "- 'path': relative path from repo root (e.g. src/App.tsx)"
+            echo "- 'content': the COMPLETE updated file — not a diff, not a snippet, the whole file"
+            echo "- Only include files you actually changed"
+            echo "- Output nothing before or after the JSON object"
+          } > copilot-prompt.txt
+          
+          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines)"
+
+      - name: Cache Copilot CLI
+        uses: actions/cache@v4
+        id: cache-copilot
+        with:
+          path: ~/.local/bin
+          key: copilot-cli-${{ runner.os }}
+
+      - name: Install Copilot CLI
+        if: steps.cache-copilot.outputs.cache-hit != 'true'
+        run: curl -fsSL https://gh.io/copilot-install | bash
+
+      - name: Add Copilot CLI to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run Copilot and capture output
+        id: ai_fix
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          copilot -p "$(cat copilot-prompt.txt)" \
+            --model gpt-4.1 \
+            --no-ask-user \
+            2>&1 | tee /tmp/copilot-output.log
+          
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+            echo "::error::Copilot CLI failed — check COPILOT_PAT secret and CLI flags"
+            exit 1
+          fi
+          
+          echo "=== Raw Copilot output ==="
+          cat /tmp/copilot-output.log
+
+      - name: Apply AI-generated file changes
+        id: apply_changes
+        run: |
+          RAW=$(cat /tmp/copilot-output.log)
+          
+          # Attempt 1: whole output is valid JSON with a "files" key
+          if ! JSON=$(printf '%s' "$RAW" | jq -e 'select(has("files"))' 2>/dev/null); then
+            # Attempt 2: extract the outermost {...} block containing "files" using PCRE
+            EXTRACTED=$(printf '%s' "$RAW" | grep -oP '(?s)\{.*"files".*\}' | head -1 || true)
+            JSON=$(printf '%s' "$EXTRACTED" | jq -e 'select(has("files"))' 2>/dev/null || true)
+          fi
+          
+          if [ -z "$JSON" ]; then
+            echo "No JSON file changes found in Copilot output."
+            echo "--- Copilot output (first 2000 chars) ---"
+            printf '%s' "$RAW" | head -c 2000
+            echo "No files written." > /tmp/ai_analysis.txt
+            exit 0
+          fi
+          
+          FILE_COUNT=$(printf '%s' "$JSON" | jq '.files | length')
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "JSON parsed but no files listed."
+            echo "No files written." > /tmp/ai_analysis.txt
+            exit 0
+          fi
+          
+          WRITTEN=""
+          while IFS= read -r entry; do
+            PATH_VAL=$(printf '%s' "$entry" | jq -r '.path // "" | ltrimstr(" ") | rtrimstr(" ")')
+            [ -z "$PATH_VAL" ] && continue
+          
+            case "$PATH_VAL" in
+              /*|../*|*/../*|*/..| ..|.git|.git/*|.github/workflows|.github/workflows/*)
+                echo "Skipping unsafe path: $PATH_VAL"
+                continue
+                ;;
+            esac
+            mkdir -p "$(dirname "$PATH_VAL")"
+            printf '%s' "$entry" | jq -rj '.content // ""' > "$PATH_VAL"
+            echo "Wrote: $PATH_VAL"
+            WRITTEN="${WRITTEN:+$WRITTEN, }$PATH_VAL"
+          done < <(printf '%s' "$JSON" | jq -c '.files[]')
+          
+          if [ -n "$WRITTEN" ]; then
+            echo "AI applied changes to: $WRITTEN" > /tmp/ai_analysis.txt
+          else
+            echo "No files written." > /tmp/ai_analysis.txt
+          fi
+          echo "Total files written: $FILE_COUNT"
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          # Remove the prompt file so it never ends up in the PR
+          rm -f copilot-prompt.txt
+          
+          UNTRACKED=$(git ls-files --others --exclude-standard)
+          if git diff --quiet && git diff --staged --quiet && [ -z "$UNTRACKED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No file changes produced"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "=== Modified files ==="
+            git diff --name-only
+            echo "=== Untracked files ==="
+            echo "$UNTRACKED"
+          fi
+
+      - name: Create pull request with AI fixes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        id: create_pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_PAT }}
+          ISSUE_NUMBER: ${{ steps.resolve.outputs.number }}
+          ISSUE_TITLE: ${{ steps.resolve.outputs.title }}
+          JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
+        run: |
+          git config --global user.name "AI Issue Fixer"
+          git config --global user.email "ai-fixer@github.com"
+          
+          # Read the Jira key from the issue body
+          ISSUE_BODY=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" \
+            | jq -r '.body // ""')
+          JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-key: )[A-Z][A-Z0-9]*-[0-9]+(?= -->)' || true)
+          
+          # Create a branch using the Jira key
+          if [ -z "$JIRA_KEY" ]; then
+            echo "❌ No Jira key found in issue body — cannot create branch"
+            exit 1
+          fi
+          BRANCH="feature/${JIRA_KEY}"
+          git checkout -b "$BRANCH"
+          
+          git add -A
+          
+          # Commit — include "Fixes #N" so GitHub auto-closes the issue on merge
+          ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated code changes")
+          COMMIT_BODY="Fixes #${ISSUE_NUMBER}"
+          [ -n "$JIRA_KEY" ] && COMMIT_BODY=$(printf '%s\nJira: %s' "$COMMIT_BODY" "$JIRA_KEY")
+          COMMIT_MSG=$(printf 'fix: AI-generated fix for issue #%s\n\n%s\n\n%s' \
+            "$ISSUE_NUMBER" "$ANALYSIS" "$COMMIT_BODY")
+          git commit -m "$COMMIT_MSG"
+          
+          git push origin "$BRANCH"
+          
+          # Build PR title — strip any existing [JIRA-KEY] prefix from the
+          # issue title so it doesn't appear twice when we prepend it below
+          CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
+          if [ -n "$JIRA_KEY" ]; then
+            PR_TITLE="Refs:${JIRA_KEY} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
+          else
+            PR_TITLE="Refs:GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
+          fi
+          
+          # Build PR body — embed the Jira key so the later used workflow close-on-merge.yml/downstream automation can find it
+          ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")
+          CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | awk 'NF{printf "- `%s`\n", $0}')
+          JIRA_DOMAIN_CLEAN="${JIRA_DOMAIN%/}"
+          
+          JIRA_LINE=""
+          if [ -n "$JIRA_KEY" ] && [ -n "$JIRA_DOMAIN_CLEAN" ]; then
+            JIRA_LINE="**Jira:** [${JIRA_KEY}](https://${JIRA_DOMAIN_CLEAN}/browse/${JIRA_KEY})"
+          elif [ -n "$JIRA_KEY" ]; then
+            JIRA_LINE="**Jira:** ${JIRA_KEY}"
+          fi
+          
+          PR_BODY=$(jq -rn \
+            --arg issue   "$ISSUE_NUMBER" \
+            --arg jira    "$JIRA_LINE" \
+            --arg analysis "$ANALYSIS" \
+            --arg changed  "$CHANGED_FILES" \
+            --arg jira_key "$JIRA_KEY" \
+            --arg title   "$CLEAN_TITLE" \
+            '(if $jira_key != "" then "## 🤖 AI-Generated Fix — Refs:" + $jira_key + " - " + $title else "## 🤖 AI-Generated Fix" end) +
+             "\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (gpt-4.1)" +
+             (if $jira != "" then "\n" + $jira else "" end) +
+             "\n\n### Analysis\n" + $analysis +
+             "\n\n### Changed Files\n" + $changed +
+             "\n\n---\nFixes #" + $issue +
+             (if $jira_key != "" then "\n<!-- jira-key: " + $jira_key + " -->" else "" end)')
+          
+          PR_BODY_JSON=$(printf '%s' "$PR_BODY" | jq -Rs '.')
+          PR_TITLE_JSON=$(printf '%s' "$PR_TITLE" | jq -Rs '.')
+          
+          PR_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls" \
+            -d "{\"title\": ${PR_TITLE_JSON}, \"body\": ${PR_BODY_JSON}, \"head\": \"${BRANCH}\", \"base\": \"${{ github.event.repository.default_branch }}\"}")
+          
+          PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number // empty')
+          PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // empty')
+          
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "jira_key=$JIRA_KEY" >> $GITHUB_OUTPUT
+          echo "clean_title=$CLEAN_TITLE" >> $GITHUB_OUTPUT
+          echo "✅ PR #${PR_NUMBER} created: $PR_URL"
+
+      - name: Comment on issue with PR link
+        if: steps.create_pr.outputs.pr_number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "See PR for details.")
+          JIRA_KEY="${{ steps.create_pr.outputs.jira_key }}"
+          CLEAN_TITLE="${{ steps.create_pr.outputs.clean_title }}"
+          if [ -n "$JIRA_KEY" ]; then
+            HEADER="🤖 **AI-Generated Fix — Refs:${JIRA_KEY} - ${CLEAN_TITLE}**"
+          else
+            HEADER="🤖 **AI-Generated Fix**"
+          fi
+          COMMENT=$(printf '%s\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed. (Only if close-on-merge workflow gets added with needed credentials)' \
+            "$HEADER" \
+            "$ANALYSIS" \
+            "${{ steps.create_pr.outputs.pr_url }}")
+          
+          COMMENT_JSON=$(jq -n --arg body "$COMMENT" '{"body": $body}')
+          
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.resolve.outputs.number }}/comments" \
+            -d "$COMMENT_JSON"
+
+      - name: Comment when no changes were produced
+        if: steps.check_changes.outputs.has_changes == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.resolve.outputs.number }}/comments" \
+            -d '{"body":"🤖 **AI Analysis Complete** — No code changes were identified for this issue. Provide more detail or use `/fix-ai <extra context>` to give the AI more guidance."}'
+ 
