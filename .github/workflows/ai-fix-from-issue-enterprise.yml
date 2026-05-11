@@ -360,9 +360,11 @@ jobs:
           echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
 
           # Derive scope from the first folder segment of each changed file path
+          # Only consider paths that have a subfolder (contain '/'); root-level files are skipped
           SCOPE=$(echo "$WRITTEN" | tr ',' '\n' | sed 's/^ *//' | \
+            grep '/' | \
             while IFS= read -r f; do echo "$f" | cut -d'/' -f1; done | \
-            grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+            grep -v '^$' | sort -u | head -1)
           [ -z "$SCOPE" ] && SCOPE="jira-ai"
           echo "scope=$SCOPE" >> $GITHUB_OUTPUT
 
