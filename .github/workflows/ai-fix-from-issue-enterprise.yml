@@ -101,7 +101,32 @@ jobs:
           
           ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title // "Untitled"')
           ISSUE_BODY=$(echo "$ISSUE_JSON"  | jq -r '.body  // "No description."')
-          
+
+          # Extract Jira issue type from the issue body table
+          ISSUE_TYPE=$(echo "$ISSUE_BODY" | grep -i '| \*\*Type\*\*' | grep -oP '(?<=\| )[A-Za-z ]+(?= \|?\s*$)' | xargs || echo "Task")
+
+          # Build type-specific guidance for the prompt
+          case "$(echo "$ISSUE_TYPE" | tr '[:upper:]' '[:lower:]')" in
+            bug*)
+              TYPE_GUIDANCE="This is a BUG fix. Focus on the minimal change that corrects the broken behaviour. Do NOT refactor surrounding code or add unrelated improvements."
+              ;;
+            story|feature*)
+              TYPE_GUIDANCE="This is a FEATURE request. Implement the new capability while preserving all existing behaviour. Consider how the new code integrates with existing components."
+              ;;
+            refactor*)
+              TYPE_GUIDANCE="This is a REFACTOR. Restructure the code for clarity or performance but preserve all existing behaviour exactly. Do not change any functionality."
+              ;;
+            doc*)
+              TYPE_GUIDANCE="This is a DOCUMENTATION update. Only update comments, README files, or documentation. Do not change any logic or functionality."
+              ;;
+            test*)
+              TYPE_GUIDANCE="This is a TEST task. Add or update test files to cover the described scenario. Do not change production code unless a clear bug is discovered."
+              ;;
+            *)
+              TYPE_GUIDANCE="Implement the changes described in the issue with minimal impact on unrelated code."
+              ;;
+          esac
+
           # Build repository file tree
           FILE_TREE=$(git ls-files \
             | grep -E '\.(ts|tsx|js|jsx|css|scss|html|json)$' \
@@ -198,6 +223,9 @@ jobs:
             echo "Write this analysis as a brief comment inside the JSON output field 'analysis'."
             echo ""
             echo "## Step 2 — Write the code"
+            echo "Issue type: ${ISSUE_TYPE}"
+            echo "Guidance: ${TYPE_GUIDANCE}"
+            echo ""
             echo "Now write the actual code changes based on your analysis above."
             echo "- Preserve ALL existing functionality — do not remove or break any existing features."
             echo "- Only add or modify what is needed to implement the fix."
