@@ -159,9 +159,17 @@ jobs:
             echo "## REQUIRED OUTPUT FORMAT"
             echo "Respond with ONLY a JSON object — no explanation, no markdown fences around the JSON itself:"
             echo ""
-            echo '{"files": [{"path": "frontend/src/App.tsx", "content": "// full file content here"}, {"path": "frontend/src/App.css", "content": "/* full file content */"}]}'
+            echo '{"type": "fix", "files": [{"path": "frontend/src/App.tsx", "content": "// full file content here"}, {"path": "frontend/src/App.css", "content": "/* full file content */"}]}'
             echo ""
             echo "Rules for the JSON:"
+            echo "- 'type': conventional commit type based on the nature of your changes:"
+            echo "    fix      — bug fix or correcting broken behaviour"
+            echo "    feat     — new feature or new capability added"
+            echo "    refactor — code restructure with no behaviour change"
+            echo "    style    — formatting, whitespace, or CSS-only changes"
+            echo "    chore    — config, tooling, or dependency updates"
+            echo "    docs     — documentation only"
+            echo "    test     — adding or updating tests"
             echo "- 'path': relative path from repo root (e.g. frontend/src/App.tsx)"
             echo "- 'content': the COMPLETE updated file — not a diff, not a snippet, the whole file"
             echo "- Only include files you actually changed"
@@ -252,6 +260,14 @@ jobs:
             echo "No files written." > /tmp/ai_analysis.txt
           fi
           echo "Total files written: $FILE_COUNT"
+
+          COMMIT_TYPE=$(printf '%s' "$JSON" | jq -r '.type // "fix"')
+          # Validate — fall back to "fix" if the AI returns something unexpected
+          case "$COMMIT_TYPE" in
+            fix|feat|refactor|style|chore|docs|test) ;;
+            *) COMMIT_TYPE="fix" ;;
+          esac
+          echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
 
       - name: Check for changes
         id: check_changes
@@ -347,11 +363,14 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" \
             | jq -r '.body // ""')
-          JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-key: )[A-Z]+-[0-9]+(?= -->)' || true)
+          JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-key: )[A-Z][A-Z0-9]*-[0-9]+(?= -->)' || true)
 
-          # Create a timestamped branch
-          TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-          BRANCH="feature/${ISSUE_NUMBER}"
+          # Create a branch using the Jira key
+          if [ -z "$JIRA_KEY" ]; then
+            echo "❌ No Jira key found in issue body — cannot create branch"
+            exit 1
+          fi
+          BRANCH="feature/${JIRA_KEY}"
           git checkout -b "$BRANCH"
 
           git add -A
@@ -366,14 +385,10 @@ jobs:
 
           git push origin "$BRANCH"
 
-          # Build PR title — strip any existing [JIRA-KEY] prefix from the
-          # issue title so it doesn't appear twice when we prepend it below
-          CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z]\+-[0-9]\+\][[:space:]]*//')
-          if [ -n "$JIRA_KEY" ]; then
-            PR_TITLE="Refs:${JIRA_KEY} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
-          else
-            PR_TITLE="Refs:GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
-          fi
+          # Build PR title using conventional commit format
+          COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
+          CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
+          PR_TITLE="${COMMIT_TYPE}(jira-ai): ${JIRA_KEY} - ${CLEAN_TITLE}"
 
           # Build PR body — embed the Jira key so the later used workflow close-on-merge.yml/downstream automation can find it
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")

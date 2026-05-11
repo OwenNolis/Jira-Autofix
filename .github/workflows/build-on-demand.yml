@@ -1,0 +1,132 @@
+# Triggered by a /build comment on a PR created by the ai-fix-from-issue workflow.
+# Checks out the PR branch, finds the project root, and runs npm install + npm run build.
+
+name: Build on Demand
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    if: >
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/build')
+
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Acknowledge trigger (add 👀 reaction)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -d '{"content":"eyes"}' > /dev/null
+
+      - name: Get PR branch
+        id: pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_JSON=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}")
+          BRANCH=$(echo "$PR_JSON" | jq -r '.head.ref')
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Building branch: $BRANCH"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.branch }}
+          fetch-depth: 1
+
+      - name: Check dependencies
+        run: |
+          if ! command -v jq &>/dev/null; then
+            sudo apt-get install -y -qq jq
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      - name: Verify build compiles
+        id: build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PKG_DIR=$(find . -maxdepth 2 -name "package.json" \
+            ! -path "*/node_modules/*" \
+            ! -path "*/.github/*" \
+            | head -1 | xargs dirname)
+
+          if [ -z "$PKG_DIR" ]; then
+            echo "result=no_package" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Building in $PKG_DIR"
+          cd "$PKG_DIR"
+
+          if ! npm install --legacy-peer-deps > /tmp/npm-install.log 2>&1; then
+            echo "result=install_failed" >> $GITHUB_OUTPUT
+            echo "log<<EOF" >> $GITHUB_OUTPUT
+            tail -c 2000 /tmp/npm-install.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if npm run build 2>&1 | tee /tmp/build-output.log; then
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "result=failed" >> $GITHUB_OUTPUT
+            echo "log<<EOF" >> $GITHUB_OUTPUT
+            tail -c 3000 /tmp/build-output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post build result comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESULT="${{ steps.build.outputs.result }}"
+          LOG="${{ steps.build.outputs.log }}"
+
+          case "$RESULT" in
+            success)
+              BODY="✅ **Build succeeded** on branch \`${{ steps.pr.outputs.branch }}\`."
+              ;;
+            failed)
+              BODY=$(jq -n --arg log "$LOG" \
+                '"❌ **Build failed** — the code does not compile.\n\n**Errors:**\n```\n" + $log + "\n```"')
+              ;;
+            install_failed)
+              BODY=$(jq -n --arg log "$LOG" \
+                '"❌ **npm install failed.**\n\n```\n" + $log + "\n```"')
+              ;;
+            no_package)
+              BODY="⚠️ **No \`package.json\` found** — nothing to build."
+              ;;
+            *)
+              BODY="⚠️ Build check produced no result."
+              ;;
+          esac
+
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -d "{\"body\": $( printf '%s' "$BODY" | jq -Rs '.' )}"
