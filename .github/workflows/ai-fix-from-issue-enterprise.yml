@@ -341,8 +341,9 @@ jobs:
           
           # Build PR title using conventional commit format
           COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
+          SCOPE="${{ steps.apply_changes.outputs.scope }}"
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
-          PR_TITLE="${COMMIT_TYPE}(jira-ai): ${JIRA_KEY} - ${CLEAN_TITLE}"
+          PR_TITLE="${COMMIT_TYPE}(${SCOPE}): ${JIRA_KEY} - ${CLEAN_TITLE}"
           
           # Build PR body — embed the Jira key so the later used workflow close-on-merge.yml/downstream automation can find it
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")
