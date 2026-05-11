@@ -332,14 +332,10 @@ jobs:
           
           git push origin "$BRANCH"
           
-          # Build PR title — strip any existing [JIRA-KEY] prefix from the
-          # issue title so it doesn't appear twice when we prepend it below
+          # Build PR title using conventional commit format
+          COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
-          if [ -n "$JIRA_KEY" ]; then
-            PR_TITLE="Refs:${JIRA_KEY} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
-          else
-            PR_TITLE="Refs:GH-${ISSUE_NUMBER} - ${CLEAN_TITLE} (Closes #${ISSUE_NUMBER})"
-          fi
+          PR_TITLE="${COMMIT_TYPE}(jira-ai): ${JIRA_KEY} - ${CLEAN_TITLE}"
           
           # Build PR body — embed the Jira key so the later used workflow close-on-merge.yml/downstream automation can find it
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")
