@@ -339,7 +339,11 @@ jobs:
             WRITTEN="${WRITTEN:+$WRITTEN, }$PATH_VAL"
           done < <(printf '%s' "$JSON" | jq -c '.files[]')
           
-          if [ -n "$WRITTEN" ]; then
+          # Use the AI's own analysis field if provided, otherwise fall back to file list
+          AI_ANALYSIS=$(printf '%s' "$JSON" | jq -r '.analysis // ""')
+          if [ -n "$AI_ANALYSIS" ]; then
+            echo "$AI_ANALYSIS" > /tmp/ai_analysis.txt
+          elif [ -n "$WRITTEN" ]; then
             echo "AI applied changes to: $WRITTEN" > /tmp/ai_analysis.txt
           else
             echo "No files written." > /tmp/ai_analysis.txt
