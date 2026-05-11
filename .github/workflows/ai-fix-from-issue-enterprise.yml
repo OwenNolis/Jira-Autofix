@@ -107,19 +107,19 @@ jobs:
 
           # Build type-specific guidance for the prompt
           case "$(echo "$ISSUE_TYPE" | tr '[:upper:]' '[:lower:]')" in
-            bug*)
+            *bug*)
               TYPE_GUIDANCE="This is a BUG fix. Focus on the minimal change that corrects the broken behaviour. Do NOT refactor surrounding code or add unrelated improvements."
               ;;
-            story|feature*)
+            *story*|*feature*)
               TYPE_GUIDANCE="This is a FEATURE request. Implement the new capability while preserving all existing behaviour. Consider how the new code integrates with existing components."
               ;;
-            refactor*)
+            *refactor*)
               TYPE_GUIDANCE="This is a REFACTOR. Restructure the code for clarity or performance but preserve all existing behaviour exactly. Do not change any functionality."
               ;;
-            doc*)
+            *doc*)
               TYPE_GUIDANCE="This is a DOCUMENTATION update. Only update comments, README files, or documentation. Do not change any logic or functionality."
               ;;
-            test*)
+            *test*)
               TYPE_GUIDANCE="This is a TEST task. Add or update test files to cover the described scenario. Do not change production code unless a clear bug is discovered."
               ;;
             *)
