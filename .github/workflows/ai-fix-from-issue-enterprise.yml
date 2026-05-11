@@ -4,7 +4,7 @@ name: AI Fix from GitHub Issue
 
 on:
   issues:
-    types: [ opened, labeled ]
+    types: [ labeled ]
   issue_comment:
     types: [ created ]
   workflow_dispatch:
@@ -22,13 +22,11 @@ jobs:
     runs-on: ubuntu-latest
 
     # Run when:
-    #   • Dispatched directly with an issue number, OR
-    #   • An issue is opened, OR
+    #   • Dispatched directly with an issue number (jira-label-trigger), OR
     #   • An issue was labeled with "ai-fix", OR
     #   • A comment starts with "/fix-ai" on a real issue (not a PR)
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' && github.event.action == 'opened') ||
       (github.event_name == 'issues' && github.event.label.name == 'ai-fix') ||
       (github.event_name == 'issue_comment' &&
        startsWith(github.event.comment.body, '/fix-ai') &&
