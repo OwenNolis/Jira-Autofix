@@ -1,0 +1,3216 @@
+{
+  "meta": {
+    "featureId": "feature-012-kledij-webshop",
+    "title": "Technische Analyse - Kleding Webshop",
+    "version": "1.0.0"
+  },
+  "scope": {
+    "inScope": [
+      "zoeken/filteren",
+      "productdetail",
+      "winkelmand",
+      "checkout",
+      "betaling",
+      "account",
+      "orderhistoriek",
+      "admin productbeheer",
+      "voorraadbeheer",
+      "retouraanvraag"
+    ],
+    "outOfScope": [
+      "fysieke winkelkassa",
+      "loyalty programma",
+      "marketplace voor externe verkopers",
+      "geavanceerde AI styling assistant"
+    ]
+  },
+  "assumptions": [
+    "Wat is de exacte definitie van 'actieve' kledingproducten?",
+    "Welke specifieke betaalmethoden worden ondersteund naast Bancontact en Card?",
+    "Wat is de maximale termijn voor het indienen van een retouraanvraag na levering (naast de 14 dagen genoemd in BR-007)?",
+    "Hoe wordt omgegaan met het annuleren van bestellingen door de klant of admin?",
+    "Zijn er specifieke eisen voor de beveiliging van de JWT tokens?",
+    "Hoe wordt de voorraad beheerd bij meerdere gelijktijdige bestellingen van hetzelfde item?"
+  ],
+  "openQuestions": [
+    "Wat is de exacte definitie van 'actieve' kledingproducten?",
+    "Welke specifieke betaalmethoden worden ondersteund naast Bancontact en Card?",
+    "Wat is de maximale termijn voor het indienen van een retouraanvraag na levering (naast de 14 dagen genoemd in BR-007)?",
+    "Hoe wordt omgegaan met het annuleren van bestellingen door de klant of admin?",
+    "Zijn er specifieke eisen voor de beveiliging van de JWT tokens?",
+    "Hoe wordt de voorraad beheerd bij meerdere gelijktijdige bestellingen van hetzelfde item?"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "text": "De klant kan actieve kledingproducten bekijken in een productoverzicht.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-002",
+      "text": "Klanten kunnen producten filteren op categorie, maat, kleur, prijs en beschikbaarheid.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-003",
+      "text": "De klant kan een productdetailpagina openen met prijs, beschrijving, beschikbare maten en voorraadstatus.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-004",
+      "text": "De klant kan een product met gekozen maat en kleur toevoegen aan het winkelmandje.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-005",
+      "text": "De klant kan afrekenen via een checkout met verzendgegevens, order summary en betaalmethode.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-006",
+      "text": "De klant kan zijn bestelgeschiedenis en orderstatus bekijken.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-007",
+      "text": "De admin kan producten, categorie\u00ebn en orders beheren.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-008",
+      "text": "De admin kan bestellingen openen en retouraanvragen aanmaken.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-009",
+      "text": "De klant kan een retouraanvraag indienen voor een geleverde bestelling.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-010",
+      "text": "Een product kan alleen worden besteld wanneer de gekozen maat op voorraad is.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-011",
+      "text": "De knop Toevoegen aan winkelmand wordt disabled wanneer de gekozen maat/kleur niet beschikbaar is.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-012",
+      "text": "Een bestelling initieert status 'Pending' en wordt pas Paid na succesvolle webhook van de betalingsprovider.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-013",
+      "text": "Voorraad wordt gereserveerd bij ordercreatie en definitief verminderd na een succesvolle betaling.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-014",
+      "text": "Een klant kan alleen bestellingen bekijken.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-015",
+      "text": "Admin endpoints zijn alleen toegankelijk voor gebruikers met rol Admin.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-016",
+      "text": "Retour aanvragen kan alleen bij een bestelling met status 'Delivered' en binnen 14 dagen na levering.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-017",
+      "text": "De klant kan actieve kledingproducten bekijken in een productoverzicht.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-018",
+      "text": "Klanten kunnen producten filteren op categorie, maat, kleur, prijs en beschikbaarheid.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-019",
+      "text": "De klant kan een productdetailpagina openen met prijs, beschrijving, beschikbare maten en voorraadstatus.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-020",
+      "text": "De klant kan een product met gekozen maat en kleur toevoegen aan het winkelmandje.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-021",
+      "text": "De klant kan afrekenen via een checkout met verzendgegevens, order summary en betaalmethode.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-022",
+      "text": "De klant kan zijn bestelgeschiedenis en orderstatus bekijken.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-023",
+      "text": "De applicatie is responsive op desktop, tablet en mobiel.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-024",
+      "text": "Wachtwoorden worden gehasht opgeslagen.",
+      "priority": "must"
+    }
+  ],
+  "domain": {
+    "entities": [
+      {
+        "name": "User",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "username",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:3",
+              "maxLength:50"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "too_long",
+              "missing",
+              "invalid_value",
+              "duplicate_per_day"
+            ]
+          },
+          {
+            "name": "password",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:8"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "email",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value",
+              "duplicate_per_day"
+            ]
+          },
+          {
+            "name": "role",
+            "type": "UserRole",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "UserRole",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ClothingItem",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "name",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "description",
+            "type": "String",
+            "constraints": [],
+            "testCases": [
+              "empty",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "price",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "category",
+            "type": "Category",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "availableSizes",
+            "type": "List<String>",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "availableColors",
+            "type": "List<String>",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "inventory",
+            "type": "Inventory",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Category",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "name",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:100"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value",
+              "duplicate_per_day"
+            ]
+          },
+          {
+            "name": "description",
+            "type": "String",
+            "constraints": [],
+            "testCases": [
+              "empty",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "CartItem",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "user",
+            "type": "User",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "clothingItem",
+            "type": "ClothingItem",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "size",
+            "type": "String",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "empty",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "color",
+            "type": "String",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "empty",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "constraints": [
+              "notNull",
+              "min:1"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value",
+              "too_short"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Order",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "user",
+            "type": "User",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "orderLines",
+            "type": "List<OrderLine>",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "OrderStatus",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "totalPrice",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "shippingAddress",
+            "type": "Address",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "deliveredAt",
+            "type": "LocalDateTime",
+            "constraints": [],
+            "testCases": [
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "OrderStatus",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "OrderLine",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "order",
+            "type": "Order",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "clothingItem",
+            "type": "ClothingItem",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "size",
+            "type": "String",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "empty",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "color",
+            "type": "String",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "empty",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "constraints": [
+              "notNull",
+              "min:1"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value",
+              "too_short"
+            ]
+          },
+          {
+            "name": "pricePerUnit",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Payment",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "order",
+            "type": "Order",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "paymentMethod",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:50"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "transactionId",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "amount",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "PaymentStatus",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "PaymentStatus",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ReturnRequest",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "order",
+            "type": "Order",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "reason",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:1000"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "ReturnRequestStatus",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "requestedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "processedAt",
+            "type": "LocalDateTime",
+            "constraints": [],
+            "testCases": [
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ReturnRequestStatus",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Address",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "street",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "city",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:100"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "postalCode",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:20"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "country",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:100"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Inventory",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "clothingItem",
+            "type": "ClothingItem",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "size",
+            "type": "String",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "empty",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "color",
+            "type": "String",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "empty",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "constraints": [
+              "notNull",
+              "min:0"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value",
+              "too_short"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "api": {
+    "errorFormat": {
+      "type": "ApiError",
+      "fields": [
+        "correlationId",
+        "code",
+        "message",
+        "fieldErrors"
+      ]
+    },
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/api/clothes",
+        "summary": "Haal een lijst met kledingitems op, met filter- en sorteeropties.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "PaginatedClothingItemListResponse",
+            "notes": "Lijst met kledingitems, inclusief paginatie-informatie."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige query parameters."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "GET",
+        "path": "/api/clothes/{id}",
+        "summary": "Haal de details van een specifiek kledingitem op.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "ClothingItemDetailResponse",
+            "notes": "Details van het kledingitem."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Kledingitem niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/register",
+        "summary": "Registreer een nieuwe gebruiker.",
+        "request": {
+          "bodySchemaRef": "RegisterUserRequest",
+          "validationRules": [
+            "firstName: niet leeg",
+            "lastName: niet leeg",
+            "email: geldig e-mailformaat, niet leeg",
+            "password: niet leeg, minimaal 8 tekens"
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "AuthResponse",
+            "notes": "Gebruiker succesvol geregistreerd en ingelogd, inclusief JWT token."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "E-mailadres is al in gebruik."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "summary": "Log een gebruiker in.",
+        "request": {
+          "bodySchemaRef": "LoginUserRequest",
+          "validationRules": [
+            "email: niet leeg",
+            "password: niet leeg"
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "AuthResponse",
+            "notes": "Gebruiker succesvol ingelogd, inclusief JWT token."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige e-mail of wachtwoord."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "GET",
+        "path": "/api/cart",
+        "summary": "Haal de inhoud van het winkelmandje van de ingelogde gebruiker op.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "CartResponse",
+            "notes": "Inhoud van het winkelmandje, inclusief items en totalen."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/cart/items",
+        "summary": "Voeg een item toe aan het winkelmandje.",
+        "request": {
+          "bodySchemaRef": "AddCartItemRequest",
+          "validationRules": [
+            "clothingItemId: niet leeg",
+            "quantity: minimaal 1",
+            "size: niet leeg",
+            "color: niet leeg"
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "CartItemResponse",
+            "notes": "Item succesvol toegevoegd aan het winkelmandje."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body of ongeldige hoeveelheid."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Kledingitem niet gevonden."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onvoldoende voorraad voor de gekozen maat en kleur."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/cart/items/{id}",
+        "summary": "Update de hoeveelheid van een item in het winkelmandje.",
+        "request": {
+          "bodySchemaRef": "UpdateCartItemRequest",
+          "validationRules": [
+            "quantity: minimaal 1"
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "CartItemResponse",
+            "notes": "Winkelmandje item succesvol bijgewerkt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body of ongeldige hoeveelheid."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Winkelmandje item niet gevonden."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onvoldoende voorraad voor de bijgewerkte hoeveelheid."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/cart/items/{id}",
+        "summary": "Verwijder een item uit het winkelmandje.",
+        "request": {},
+        "responses": [
+          {
+            "status": 204,
+            "notes": "Winkelmandje item succesvol verwijderd.",
+            "bodySchemaRef": "EmptyResponse"
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Winkelmandje item niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/orders",
+        "summary": "Plaats een nieuwe bestelling.",
+        "request": {
+          "bodySchemaRef": "CreateOrderRequest",
+          "validationRules": [
+            "addressId: niet leeg",
+            "paymentMethod: niet leeg"
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "OrderResponse",
+            "notes": "Bestelling succesvol aangemaakt met status 'Pending' en betaal-URL."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Leeg winkelmandje of validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "Voorraadprobleem tijdens het aanmaken van de bestelling."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "GET",
+        "path": "/api/orders/me",
+        "summary": "Haal de bestelgeschiedenis van de ingelogde gebruiker op.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "OrderListResponse",
+            "notes": "Lijst met bestellingen van de gebruiker."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/payments/webhook",
+        "summary": "Verwerk webhook notificaties van de betalingsprovider.",
+        "request": {
+          "bodySchemaRef": "PaymentWebhookRequest",
+          "validationRules": [
+            "transactionReference: niet leeg",
+            "status: niet leeg"
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "notes": "Webhook succesvol verwerkt, orderstatus bijgewerkt.",
+            "bodySchemaRef": "EmptyResponse"
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige webhook payload."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "POST",
+        "path": "/api/returns",
+        "summary": "Dien een retouraanvraag in.",
+        "request": {
+          "bodySchemaRef": "CreateReturnRequest",
+          "validationRules": [
+            "orderId: niet leeg",
+            "orderLineId: niet leeg",
+            "reason: niet leeg, maximaal 1000 tekens"
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "ReturnRequestResponse",
+            "notes": "Retouraanvraag succesvol ingediend."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Retouraanvraag niet toegestaan (bv. te laat, niet geleverd, etc.)."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Bestelling of orderregel niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/admin/clothes",
+        "summary": "Voeg een nieuw kledingitem toe (alleen voor admins).",
+        "request": {
+          "bodySchemaRef": "CreateClothingItemRequest",
+          "validationRules": [
+            "name: niet leeg, maximaal 255 tekens",
+            "price: niet leeg",
+            "categoryId: niet leeg",
+            "inventory.size: niet leeg",
+            "inventory.color: niet leeg",
+            "inventory.quantity: minimaal 0"
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "ClothingItemResponse",
+            "notes": "Nieuw kledingitem succesvol aangemaakt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 403,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geautoriseerd (geen admin)."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/admin/clothes/{id}",
+        "summary": "Update een bestaand kledingitem volledig (alleen voor admins).",
+        "request": {
+          "bodySchemaRef": "UpdateClothingItemRequest",
+          "validationRules": [
+            "name: niet leeg, maximaal 255 tekens",
+            "price: niet leeg",
+            "category: niet leeg",
+            "availableSizes: niet leeg",
+            "availableColors: niet leeg",
+            "inventory.quantity: minimaal 0"
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "ClothingItemResponse",
+            "notes": "Kledingitem succesvol bijgewerkt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 403,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geautoriseerd (geen admin)."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Kledingitem niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/admin/orders/{id}/status",
+        "summary": "Update de status van een bestelling (alleen voor admins).",
+        "request": {
+          "bodySchemaRef": "UpdateOrderStatusRequest",
+          "validationRules": [
+            "status: niet leeg, moet een geldige OrderStatus zijn"
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "OrderResponse",
+            "notes": "Bestelstatus succesvol bijgewerkt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige orderstatusovergang of validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 403,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geautoriseerd (geen admin)."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Bestelling niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout."
+          }
+        ],
+        "auth": "bearer"
+      }
+    ]
+  },
+  "backend": {
+    "modules": [
+      {
+        "name": "clothing",
+        "classes": [
+          {
+            "name": "ClothingItemController",
+            "responsibility": "Behandelt HTTP-verzoeken voor kledingitems, inclusief het ophalen van lijsten en details."
+          },
+          {
+            "name": "ClothingItemService",
+            "responsibility": "Beheert de bedrijfslogica voor kledingitems, inclusief filtering, sortering en voorraadbeheer."
+          },
+          {
+            "name": "ClothingItemRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor kledingitem-entiteiten."
+          },
+          {
+            "name": "ClothingItem",
+            "responsibility": "Representeert een kledingitem in het domeinmodel."
+          },
+          {
+            "name": "ClothingItemDTO",
+            "responsibility": "Data Transfer Object voor kledingitems, gebruikt voor API-communicatie."
+          },
+          {
+            "name": "PaginatedClothingItemListResponseDTO",
+            "responsibility": "DTO voor de gepagineerde lijst van kledingitems."
+          },
+          {
+            "name": "ClothingItemDetailResponseDTO",
+            "responsibility": "DTO voor de details van een enkel kledingitem."
+          },
+          {
+            "name": "CreateClothingItemRequestDTO",
+            "responsibility": "DTO voor het aanmaken van een nieuw kledingitem."
+          },
+          {
+            "name": "UpdateClothingItemRequestDTO",
+            "responsibility": "DTO voor het updaten van een bestaand kledingitem."
+          },
+          {
+            "name": "ClothingItemNotFoundException",
+            "responsibility": "Exception die wordt gegooid wanneer een kledingitem niet wordt gevonden."
+          },
+          {
+            "name": "InsufficientStockException",
+            "responsibility": "Exception die wordt gegooid wanneer er onvoldoende voorraad is voor een kledingitem."
+          },
+          {
+            "name": "ClothingItemValidator",
+            "responsibility": "Valideert de invoer voor kledingitem-gerelateerde operaties."
+          }
+        ]
+      },
+      {
+        "name": "category",
+        "classes": [
+          {
+            "name": "CategoryService",
+            "responsibility": "Beheert de bedrijfslogica voor categorie\u00ebn."
+          },
+          {
+            "name": "CategoryRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor categorie-entiteiten."
+          },
+          {
+            "name": "Category",
+            "responsibility": "Representeert een categorie in het domeinmodel."
+          },
+          {
+            "name": "CategoryDTO",
+            "responsibility": "Data Transfer Object voor categorie\u00ebn."
+          }
+        ]
+      },
+      {
+        "name": "inventory",
+        "classes": [
+          {
+            "name": "InventoryService",
+            "responsibility": "Beheert de bedrijfslogica voor voorraad."
+          },
+          {
+            "name": "InventoryRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor voorraad-entiteiten."
+          },
+          {
+            "name": "Inventory",
+            "responsibility": "Representeert de voorraad van een kledingitem voor een specifieke maat en kleur."
+          },
+          {
+            "name": "InventoryDTO",
+            "responsibility": "Data Transfer Object voor voorraad."
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "classes": [
+          {
+            "name": "AuthController",
+            "responsibility": "Behandelt HTTP-verzoeken voor gebruikersregistratie en -login."
+          },
+          {
+            "name": "AuthService",
+            "responsibility": "Beheert de bedrijfslogica voor authenticatie, inclusief gebruikersregistratie, login en JWT-generatie."
+          },
+          {
+            "name": "UserRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor gebruikersentiteiten."
+          },
+          {
+            "name": "User",
+            "responsibility": "Representeert een gebruiker in het domeinmodel."
+          },
+          {
+            "name": "UserRole",
+            "responsibility": "Enum voor de rollen van gebruikers (bv. CUSTOMER, ADMIN)."
+          },
+          {
+            "name": "RegisterUserRequestDTO",
+            "responsibility": "DTO voor het registreren van een nieuwe gebruiker."
+          },
+          {
+            "name": "LoginUserRequestDTO",
+            "responsibility": "DTO voor het inloggen van een gebruiker."
+          },
+          {
+            "name": "AuthResponseDTO",
+            "responsibility": "DTO voor het antwoord na succesvolle authenticatie, inclusief JWT."
+          },
+          {
+            "name": "EmailAlreadyExistsException",
+            "responsibility": "Exception die wordt gegooid wanneer een e-mailadres al in gebruik is."
+          },
+          {
+            "name": "InvalidCredentialsException",
+            "responsibility": "Exception die wordt gegooid bij ongeldige inloggegevens."
+          },
+          {
+            "name": "UserValidator",
+            "responsibility": "Valideert de invoer voor gebruikersgerelateerde operaties."
+          },
+          {
+            "name": "PasswordHasher",
+            "responsibility": "Verantwoordelijk voor het hashen en verifi\u00ebren van wachtwoorden."
+          }
+        ]
+      },
+      {
+        "name": "cart",
+        "classes": [
+          {
+            "name": "CartController",
+            "responsibility": "Behandelt HTTP-verzoeken voor het winkelmandje."
+          },
+          {
+            "name": "CartService",
+            "responsibility": "Beheert de bedrijfslogica voor het winkelmandje, inclusief toevoegen, bijwerken en verwijderen van items."
+          },
+          {
+            "name": "CartItemRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor winkelmandje-item-entiteiten."
+          },
+          {
+            "name": "CartItem",
+            "responsibility": "Representeert een item in het winkelmandje."
+          },
+          {
+            "name": "CartResponseDTO",
+            "responsibility": "DTO voor het antwoord van het winkelmandje."
+          },
+          {
+            "name": "CartItemResponseDTO",
+            "responsibility": "DTO voor een enkel item in het winkelmandje."
+          },
+          {
+            "name": "AddCartItemRequestDTO",
+            "responsibility": "DTO voor het toevoegen van een item aan het winkelmandje."
+          },
+          {
+            "name": "UpdateCartItemRequestDTO",
+            "responsibility": "DTO voor het bijwerken van een item in het winkelmandje."
+          },
+          {
+            "name": "CartItemNotFoundException",
+            "responsibility": "Exception die wordt gegooid wanneer een winkelmandje-item niet wordt gevonden."
+          },
+          {
+            "name": "CartValidator",
+            "responsibility": "Valideert de invoer voor winkelmandje-gerelateerde operaties."
+          }
+        ]
+      },
+      {
+        "name": "order",
+        "classes": [
+          {
+            "name": "OrderController",
+            "responsibility": "Behandelt HTTP-verzoeken voor bestellingen."
+          },
+          {
+            "name": "OrderService",
+            "responsibility": "Beheert de bedrijfslogica voor bestellingen, inclusief creatie, statusupdates en het ophalen van bestelgeschiedenis."
+          },
+          {
+            "name": "OrderRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor bestelling-entiteiten."
+          },
+          {
+            "name": "OrderLineRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor bestellijn-entiteiten."
+          },
+          {
+            "name": "Order",
+            "responsibility": "Representeert een bestelling in het domeinmodel."
+          },
+          {
+            "name": "OrderLine",
+            "responsibility": "Representeert een regel binnen een bestelling."
+          },
+          {
+            "name": "OrderStatus",
+            "responsibility": "Enum voor de statussen van een bestelling (bv. PENDING, PAID, DELIVERED)."
+          },
+          {
+            "name": "OrderResponseDTO",
+            "responsibility": "DTO voor het antwoord van een bestelling."
+          },
+          {
+            "name": "OrderListResponseDTO",
+            "responsibility": "DTO voor een lijst met bestellingen."
+          },
+          {
+            "name": "CreateOrderRequestDTO",
+            "responsibility": "DTO voor het aanmaken van een nieuwe bestelling."
+          },
+          {
+            "name": "UpdateOrderStatusRequestDTO",
+            "responsibility": "DTO voor het bijwerken van de status van een bestelling."
+          },
+          {
+            "name": "OrderNotFoundException",
+            "responsibility": "Exception die wordt gegooid wanneer een bestelling niet wordt gevonden."
+          },
+          {
+            "name": "EmptyCartException",
+            "responsibility": "Exception die wordt gegooid wanneer een bestelling wordt aangemaakt met een leeg winkelmandje."
+          },
+          {
+            "name": "OrderCreationConflictException",
+            "responsibility": "Exception die wordt gegooid bij conflicten tijdens het aanmaken van een bestelling (bv. voorraadprobleem)."
+          },
+          {
+            "name": "OrderValidator",
+            "responsibility": "Valideert de invoer voor bestelling-gerelateerde operaties."
+          }
+        ]
+      },
+      {
+        "name": "payment",
+        "classes": [
+          {
+            "name": "PaymentController",
+            "responsibility": "Behandelt HTTP-verzoeken voor betalingen, inclusief webhooks."
+          },
+          {
+            "name": "PaymentService",
+            "responsibility": "Beheert de bedrijfslogica voor betalingen, inclusief het verwerken van webhooks en het bijwerken van orderstatussen."
+          },
+          {
+            "name": "PaymentRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor betaling-entiteiten."
+          },
+          {
+            "name": "Payment",
+            "responsibility": "Representeert een betaling in het domeinmodel."
+          },
+          {
+            "name": "PaymentStatus",
+            "responsibility": "Enum voor de statussen van een betaling (bv. SUCCESS, FAILED)."
+          },
+          {
+            "name": "PaymentWebhookRequestDTO",
+            "responsibility": "DTO voor de payload van een betalingswebhook."
+          },
+          {
+            "name": "PaymentProcessingException",
+            "responsibility": "Exception die wordt gegooid tijdens het verwerken van een betaling."
+          }
+        ]
+      },
+      {
+        "name": "returns",
+        "classes": [
+          {
+            "name": "ReturnController",
+            "responsibility": "Behandelt HTTP-verzoeken voor retouraanvragen."
+          },
+          {
+            "name": "ReturnService",
+            "responsibility": "Beheert de bedrijfslogica voor retouraanvragen, inclusief het indienen en verwerken ervan."
+          },
+          {
+            "name": "ReturnRequestRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor retouraanvraag-entiteiten."
+          },
+          {
+            "name": "ReturnRequest",
+            "responsibility": "Representeert een retouraanvraag in het domeinmodel."
+          },
+          {
+            "name": "ReturnRequestStatus",
+            "responsibility": "Enum voor de statussen van een retouraanvraag (bv. PENDING, APPROVED, REJECTED)."
+          },
+          {
+            "name": "CreateReturnRequestDTO",
+            "responsibility": "DTO voor het indienen van een retouraanvraag."
+          },
+          {
+            "name": "ReturnRequestResponseDTO",
+            "responsibility": "DTO voor het antwoord van een retouraanvraag."
+          },
+          {
+            "name": "ReturnRequestNotAllowedException",
+            "responsibility": "Exception die wordt gegooid wanneer een retouraanvraag niet is toegestaan."
+          },
+          {
+            "name": "ReturnRequestValidator",
+            "responsibility": "Valideert de invoer voor retouraanvraag-gerelateerde operaties."
+          }
+        ]
+      },
+      {
+        "name": "address",
+        "classes": [
+          {
+            "name": "AddressService",
+            "responsibility": "Beheert de bedrijfslogica voor adressen."
+          },
+          {
+            "name": "AddressRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de database voor adres-entiteiten."
+          },
+          {
+            "name": "Address",
+            "responsibility": "Representeert een adres in het domeinmodel."
+          },
+          {
+            "name": "AddressDTO",
+            "responsibility": "Data Transfer Object voor adressen."
+          }
+        ]
+      },
+      {
+        "name": "common",
+        "classes": [
+          {
+            "name": "ApiError",
+            "responsibility": "Standaardformaat voor API-foutmeldingen."
+          },
+          {
+            "name": "ApiErrorDTO",
+            "responsibility": "DTO voor de standaard API-foutmelding."
+          },
+          {
+            "name": "GlobalExceptionHandler",
+            "responsibility": "Centrale handler voor het afhandelen van exceptions en het retourneren van API-foutmeldingen."
+          },
+          {
+            "name": "SecurityConfig",
+            "responsibility": "Configureert beveiligingsinstellingen, inclusief authenticatie en autorisatie."
+          },
+          {
+            "name": "JwtTokenProvider",
+            "responsibility": "Verantwoordelijk voor het genereren en valideren van JWT-tokens."
+          },
+          {
+            "name": "PageableRequest",
+            "responsibility": "Standaard object voor paginatie- en sorteerverzoeken."
+          },
+          {
+            "name": "PageableResponse",
+            "responsibility": "Standaard object voor gepagineerde antwoorden."
+          },
+          {
+            "name": "CorrelationIdFilter",
+            "responsibility": "Filter om een correlatie-ID toe te voegen aan verzoeken voor tracing."
+          },
+          {
+            "name": "ValidationConfig",
+            "responsibility": "Configureert validatieregels en beanvalidatie."
+          }
+        ]
+      }
+    ]
+  },
+  "frontend": {
+    "routes": [
+      "/",
+      "/products/:id",
+      "/cart",
+      "/checkout",
+      "/account/orders",
+      "/account/orders/:id",
+      "/admin/products",
+      "/admin/products/new",
+      "/admin/products/:id",
+      "/admin/orders",
+      "/admin/orders/:id",
+      "/login",
+      "/register"
+    ],
+    "components": [
+      "HomePage",
+      "ProductList",
+      "ProductFilter",
+      "Pagination",
+      "ProductDetailPage",
+      "AddToCartForm",
+      "CartPage",
+      "CartItem",
+      "CheckoutButton",
+      "CheckoutPage",
+      "ShippingForm",
+      "OrderSummary",
+      "PaymentForm",
+      "PlaceOrderButton",
+      "OrderHistoryPage",
+      "OrderList",
+      "OrderItem",
+      "OrderDetailPage",
+      "ReturnRequestForm",
+      "AdminProductListPage",
+      "AdminProductTable",
+      "AddProductButton",
+      "AdminAddProductPage",
+      "AdminProductForm",
+      "AdminEditProductPage",
+      "AdminOrderListPage",
+      "AdminOrderTable",
+      "AdminOrderDetailPage",
+      "UpdateOrderStatusForm",
+      "LoginPage",
+      "LoginForm",
+      "RegisterPage",
+      "RegisterForm"
+    ]
+  },
+  "tests": {
+    "unit": [
+      "HomePage render",
+      "ProductList render",
+      "ProductFilter render",
+      "Pagination render",
+      "ProductDetailPage render",
+      "AddToCartForm render",
+      "CartPage render",
+      "CartItem render",
+      "CheckoutButton render",
+      "CheckoutPage render",
+      "ShippingForm render",
+      "OrderSummary render",
+      "PaymentForm render",
+      "PlaceOrderButton render",
+      "OrderHistoryPage render",
+      "OrderList render",
+      "OrderItem render",
+      "OrderDetailPage render",
+      "ReturnRequestForm render",
+      "AdminProductListPage render",
+      "AdminProductTable render",
+      "AddProductButton render",
+      "AdminAddProductPage render",
+      "AdminProductForm render",
+      "AdminEditProductPage render",
+      "AdminOrderListPage render",
+      "AdminOrderTable render",
+      "AdminOrderDetailPage render",
+      "UpdateOrderStatusForm render",
+      "LoginPage render",
+      "LoginForm render",
+      "RegisterPage render",
+      "RegisterForm render",
+      "ErrorDisplay render",
+      "LoadingSpinner render"
+    ],
+    "integration": [
+      "GET /api/clothes \u2192 200 OK",
+      "GET /api/clothes/{id} \u2192 200 OK",
+      "POST /api/auth/register \u2192 201 Created",
+      "POST /api/auth/login \u2192 201 Created",
+      "GET /api/cart \u2192 200 OK",
+      "POST /api/cart/items \u2192 201 Created",
+      "PATCH /api/cart/items/{id} \u2192 200 OK",
+      "DELETE /api/cart/items/{id} \u2192 204 No Content",
+      "POST /api/orders \u2192 201 Created",
+      "GET /api/orders/me \u2192 200 OK",
+      "POST /api/returns \u2192 201 Created",
+      "POST /api/admin/clothes \u2192 201 Created",
+      "PUT /api/admin/clothes/{id} \u2192 200 OK",
+      "PATCH /api/admin/orders/{id}/status \u2192 200 OK"
+    ],
+    "e2e": [
+      "Gebruiker navigeert naar de homepage, filtert producten op prijs en voegt een product toe aan het winkelmandje.",
+      "Gebruiker navigeert naar het winkelmandje, gaat door naar checkout, vult verzend- en betaalgegevens in en plaatst een bestelling.",
+      "Gebruiker logt in, bekijkt de bestelgeschiedenis en dient een retouraanvraag in voor een specifieke bestelling.",
+      "Admin logt in, voegt een nieuw kledingitem toe, bewerkt een bestaand item en update de status van een bestelling."
+    ]
+  },
+  "acceptanceCriteria": [
+    {
+      "acId": "AC-001-1",
+      "reqId": "REQ-001",
+      "given": "Er zijn actieve kledingproducten beschikbaar in de database.",
+      "when": "De gebruiker navigeert naar de productoverzichtspagina.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lijst van kledingproducten, waarbij elk product minimaal een 'id', 'name', 'price' en 'category' bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-001-2",
+      "reqId": "REQ-001",
+      "given": "Er zijn geen actieve kledingproducten beschikbaar in de database.",
+      "when": "De gebruiker navigeert naar de productoverzichtspagina.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lege lijst van kledingproducten.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-1",
+      "reqId": "REQ-002",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op categorie 'Tops' en maat 'M'.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lijst van kledingproducten die voldoen aan de filtercriteria (categorie 'Tops' en maat 'M').",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-2",
+      "reqId": "REQ-002",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op prijsbereik van \u20ac20 tot \u20ac50.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lijst van kledingproducten waarvan de prijs tussen \u20ac20 en \u20ac50 (inclusief) ligt.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-3",
+      "reqId": "REQ-002",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op een niet-bestaande categorie 'Schoenen'.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lege lijst van kledingproducten.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-4",
+      "reqId": "REQ-002",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op een maat die niet beschikbaar is voor enig product, bijvoorbeeld 'XXL'.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lege lijst van kledingproducten.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-003-1",
+      "reqId": "REQ-003",
+      "given": "Er is een specifiek kledingproduct met ID 'prod-123' beschikbaar in de database met voorraad.",
+      "when": "De gebruiker klikt op het kledingproduct met ID 'prod-123' in het overzicht.",
+      "then": "De API GET /api/clothes/prod-123 retourneert een HTTP 200 statuscode met een 'ClothingItemDetailResponse' die de 'id', 'name', 'description', 'price', 'availableSizes', 'availableColors' en 'inventory' van het product bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-003-2",
+      "reqId": "REQ-003",
+      "given": "Er is geen kledingproduct met ID 'prod-999' in de database.",
+      "when": "De gebruiker probeert de detailpagina te openen voor een niet-bestaand product met ID 'prod-999'.",
+      "then": "De API GET /api/clothes/prod-999 retourneert een HTTP 404 statuscode met een 'ApiError'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-003-3",
+      "reqId": "REQ-003",
+      "given": "Er is een specifiek kledingproduct met ID 'prod-456' beschikbaar in de database, maar de voorraad voor alle maten is 0.",
+      "when": "De gebruiker bekijkt de detailpagina van product 'prod-456'.",
+      "then": "De 'inventory' velden voor alle maten van product 'prod-456' tonen een voorraadstatus van 0.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-004-1",
+      "reqId": "REQ-004",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw' en heeft een voorraad van minimaal 1.",
+      "when": "De gebruiker selecteert maat 'L', kleur 'Blauw' voor product 'prod-789' en klikt op 'Toevoegen aan winkelmandje'.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-789', 'size': 'L', 'color': 'Blauw', 'quantity': 1} retourneert een HTTP 201 statuscode met een 'CartItemResponse' die het toegevoegde item bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-004-2",
+      "reqId": "REQ-004",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw', maar de voorraad is 0.",
+      "when": "De gebruiker selecteert maat 'L', kleur 'Blauw' voor product 'prod-789' en probeert op 'Toevoegen aan winkelmandje' te klikken.",
+      "then": "De knop 'Toevoegen aan winkelmandje' is disabled.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-004-3",
+      "reqId": "REQ-004",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw' en heeft een voorraad van 1.",
+      "when": "De gebruiker selecteert maat 'L', kleur 'Blauw' voor product 'prod-789' en klikt op 'Toevoegen aan winkelmandje' twee keer.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-789', 'size': 'L', 'color': 'Blauw', 'quantity': 1} wordt twee keer aangeroepen, en de bestaande cart item wordt ge\u00fcpdatet naar quantity 2.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-004-4",
+      "reqId": "REQ-004",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw' en heeft een voorraad van 1.",
+      "when": "De gebruiker probeert maat 'XL' toe te voegen aan het winkelmandje voor product 'prod-789', terwijl maat 'XL' niet beschikbaar is.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-789', 'size': 'XL', 'color': 'Blauw', 'quantity': 1} retourneert een HTTP 404 of 409 statuscode met een 'ApiError'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-005-1",
+      "reqId": "REQ-005",
+      "given": "De gebruiker is ingelogd en heeft minimaal \u00e9\u00e9n item in het winkelmandje.",
+      "when": "De gebruiker doorloopt het checkout proces, vult geldige verzendgegevens in, selecteert een betaalmethode en bevestigt de bestelling.",
+      "then": "De API POST /api/orders met geldige verzendgegevens en betaalmethode retourneert een HTTP 201 statuscode met een 'OrderResponse' die de 'id', 'status' (initieel 'PENDING'), 'totalPrice' en 'shippingAddress' van de bestelling bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-005-2",
+      "reqId": "REQ-005",
+      "given": "De gebruiker is ingelogd en heeft minimaal \u00e9\u00e9n item in het winkelmandje.",
+      "when": "De gebruiker probeert het checkout proces te doorlopen zonder verzendgegevens in te vullen.",
+      "then": "De API POST /api/orders retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat verzendgegevens verplicht zijn.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-005-3",
+      "reqId": "REQ-005",
+      "given": "De gebruiker is ingelogd en heeft minimaal \u00e9\u00e9n item in het winkelmandje.",
+      "when": "De gebruiker probeert het checkout proces te doorlopen met een ongeldige betaalmethode.",
+      "then": "De API POST /api/orders retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat de betaalmethode ongeldig is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-005-4",
+      "reqId": "REQ-005",
+      "given": "De gebruiker is ingelogd en het winkelmandje is leeg.",
+      "when": "De gebruiker probeert het checkout proces te starten.",
+      "then": "De checkout functionaliteit is niet toegankelijk of de API POST /api/orders retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat het winkelmandje leeg is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-006-1",
+      "reqId": "REQ-006",
+      "given": "De gebruiker is ingelogd en heeft eerder bestellingen geplaatst.",
+      "when": "De gebruiker navigeert naar de bestelgeschiedenispagina.",
+      "then": "De API GET /api/orders/me retourneert een HTTP 200 statuscode met een 'OrderListResponse' die een lijst van de bestellingen van de gebruiker bevat, inclusief 'id', 'createdAt', 'status' en 'totalPrice'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-006-2",
+      "reqId": "REQ-006",
+      "given": "De gebruiker is ingelogd en heeft nog geen bestellingen geplaatst.",
+      "when": "De gebruiker navigeert naar de bestelgeschiedenispagina.",
+      "then": "De API GET /api/orders/me retourneert een HTTP 200 statuscode met een lege 'OrderListResponse'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-006-3",
+      "reqId": "REQ-006",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-abc' met status 'PENDING'.",
+      "when": "De gebruiker bekijkt de details van bestelling 'order-abc' in de bestelgeschiedenis.",
+      "then": "De status van bestelling 'order-abc' wordt correct weergegeven als 'PENDING'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-007-1",
+      "reqId": "REQ-007",
+      "given": "De gebruiker is ingelogd met de rol 'Admin'.",
+      "when": "De admin voegt een nieuw kledingproduct toe via de admin interface.",
+      "then": "De API POST /api/admin/clothes met geldige productgegevens retourneert een HTTP 201 statuscode met een 'ClothingItemResponse' van het aangemaakte product.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-007-2",
+      "reqId": "REQ-007",
+      "given": "De gebruiker is ingelogd met de rol 'Admin'.",
+      "when": "De admin wijzigt de prijs van een bestaand kledingproduct met ID 'prod-xyz'.",
+      "then": "De API PUT /api/admin/clothes/prod-xyz met een nieuwe prijs retourneert een HTTP 200 statuscode met een 'ClothingItemResponse' van het bijgewerkte product.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-007-3",
+      "reqId": "REQ-007",
+      "given": "De gebruiker is ingelogd met de rol 'Admin'.",
+      "when": "De admin probeert een product toe te voegen met een ongeldige prijs (bv. negatief getal).",
+      "then": "De API POST /api/admin/clothes retourneert een HTTP 400 statuscode met een 'ApiError'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-007-4",
+      "reqId": "REQ-007",
+      "given": "Er zijn bestaande orders in het systeem.",
+      "when": "De admin bekijkt de lijst met orders.",
+      "then": "Er is een endpoint beschikbaar voor de admin om alle orders te bekijken (impliciet via de admin rol check op andere endpoints, of een expliciet GET /api/admin/orders endpoint indien beschikbaar).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-008-1",
+      "reqId": "REQ-008",
+      "given": "De gebruiker is ingelogd met de rol 'Admin' en er is een bestelling met ID 'order-def' die geleverd is.",
+      "when": "De admin opent de details van bestelling 'order-def'.",
+      "then": "De admin kan de details van bestelling 'order-def' bekijken, inclusief de orderregels, verzendgegevens en status.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-008-2",
+      "reqId": "REQ-008",
+      "given": "De gebruiker is ingelogd met de rol 'Admin' en er is een bestelling met ID 'order-ghi' die nog niet geleverd is.",
+      "when": "De admin probeert een retouraanvraag aan te maken voor bestelling 'order-ghi'.",
+      "then": "De API POST /api/returns met orderId 'order-ghi' retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat een retour alleen mogelijk is voor geleverde bestellingen.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-008-3",
+      "reqId": "REQ-008",
+      "given": "De gebruiker is ingelogd met de rol 'Admin' en er is een bestelling met ID 'order-jkl' die geleverd is.",
+      "when": "De admin maakt een retouraanvraag aan voor bestelling 'order-jkl' met reden 'Product beschadigd'.",
+      "then": "De API POST /api/returns met body {'orderId': 'order-jkl', 'reason': 'Product beschadigd'} retourneert een HTTP 201 statuscode met een 'ReturnRequestResponse' die de aangemaakte retouraanvraag bevat met status 'PENDING'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-009-1",
+      "reqId": "REQ-009",
+      "given": "De gebruiker is ingelogd en heeft een geleverde bestelling met ID 'order-mno' die binnen 14 dagen na levering is.",
+      "when": "De gebruiker dient een retouraanvraag in voor bestelling 'order-mno' met reden 'Niet tevreden'.",
+      "then": "De API POST /api/returns met body {'orderId': 'order-mno', 'reason': 'Niet tevreden'} retourneert een HTTP 201 statuscode met een 'ReturnRequestResponse' die de retouraanvraag bevat met status 'PENDING'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-009-2",
+      "reqId": "REQ-009",
+      "given": "De gebruiker is ingelogd en heeft een geleverde bestelling met ID 'order-pqr' die meer dan 14 dagen geleden geleverd is.",
+      "when": "De gebruiker probeert een retouraanvraag in te dienen voor bestelling 'order-pqr'.",
+      "then": "De API POST /api/returns met orderId 'order-pqr' retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat de retourtermijn is verstreken.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-009-3",
+      "reqId": "REQ-009",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-stu' die nog niet geleverd is.",
+      "when": "De gebruiker probeert een retouraanvraag in te dienen voor bestelling 'order-stu'.",
+      "then": "De API POST /api/returns met orderId 'order-stu' retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat een retour alleen mogelijk is voor geleverde bestellingen.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-010-1",
+      "reqId": "REQ-010",
+      "given": "Product 'prod-abc' is beschikbaar met maat 'M' en kleur 'Rood', en de voorraad voor maat 'M' is 5.",
+      "when": "De gebruiker probeert product 'prod-abc' met maat 'M' en kleur 'Rood' toe te voegen aan het winkelmandje met quantity 1.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-abc', 'size': 'M', 'color': 'Rood', 'quantity': 1} retourneert een HTTP 201 statuscode.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-010-2",
+      "reqId": "REQ-010",
+      "given": "Product 'prod-abc' is beschikbaar met maat 'M' en kleur 'Rood', maar de voorraad voor maat 'M' is 0.",
+      "when": "De gebruiker probeert product 'prod-abc' met maat 'M' en kleur 'Rood' toe te voegen aan het winkelmandje met quantity 1.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-abc', 'size': 'M', 'color': 'Rood', 'quantity': 1} retourneert een HTTP 409 statuscode met een 'ApiError' die aangeeft dat het product niet op voorraad is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-010-3",
+      "reqId": "REQ-010",
+      "given": "Product 'prod-abc' is beschikbaar met maat 'M' en kleur 'Rood', en de voorraad voor maat 'M' is 5.",
+      "when": "De gebruiker probeert product 'prod-abc' met maat 'M' en kleur 'Rood' toe te voegen aan het winkelmandje met quantity 6.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-abc', 'size': 'M', 'color': 'Rood', 'quantity': 6} retourneert een HTTP 409 statuscode met een 'ApiError' die aangeeft dat de gevraagde hoeveelheid de voorraad overschrijdt.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-011-1",
+      "reqId": "REQ-011",
+      "given": "Product 'prod-xyz' is beschikbaar met maat 'L' en kleur 'Groen', en de voorraad voor deze combinatie is 3.",
+      "when": "De gebruiker selecteert maat 'L' en kleur 'Groen' voor product 'prod-xyz'.",
+      "then": "De knop 'Toevoegen aan winkelmandje' is enabled.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-011-2",
+      "reqId": "REQ-011",
+      "given": "Product 'prod-xyz' is beschikbaar met maat 'L' en kleur 'Groen', maar de voorraad voor deze combinatie is 0.",
+      "when": "De gebruiker selecteert maat 'L' en kleur 'Groen' voor product 'prod-xyz'.",
+      "then": "De knop 'Toevoegen aan winkelmandje' is disabled.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-011-3",
+      "reqId": "REQ-011",
+      "given": "Product 'prod-xyz' is beschikbaar met maat 'L' en kleur 'Groen', en de voorraad voor deze combinatie is 3.",
+      "when": "De gebruiker selecteert maat 'L' en kleur 'Blauw' voor product 'prod-xyz', waarbij deze combinatie niet op voorraad is.",
+      "then": "De knop 'Toevoegen aan winkelmandje' is disabled.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-012-1",
+      "reqId": "REQ-012",
+      "given": "Een gebruiker plaatst een nieuwe bestelling.",
+      "when": "De bestelling wordt succesvol aangemaakt via POST /api/orders.",
+      "then": "De status van de bestelling is 'PENDING'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-012-2",
+      "reqId": "REQ-012",
+      "given": "Een bestelling met ID 'order-xyz' heeft de status 'PENDING'.",
+      "when": "De betalingsprovider stuurt een succesvolle webhook callback voor bestelling 'order-xyz'.",
+      "then": "De status van bestelling 'order-xyz' wordt bijgewerkt naar 'PAID'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-012-3",
+      "reqId": "REQ-012",
+      "given": "Een bestelling met ID 'order-abc' heeft de status 'PENDING'.",
+      "when": "De betalingsprovider stuurt een mislukte webhook callback voor bestelling 'order-abc'.",
+      "then": "De status van bestelling 'order-abc' blijft 'PENDING' (of wordt bijgewerkt naar een relevante 'FAILED' status indien gedefinieerd).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-013-1",
+      "reqId": "REQ-013",
+      "given": "Product 'prod-111' heeft voorraad van 5 stuks voor maat 'S' en kleur 'Zwart'.",
+      "when": "Een gebruiker plaatst een bestelling voor 2 stuks van product 'prod-111' met maat 'S' en kleur 'Zwart'.",
+      "then": "De voorraad voor product 'prod-111', maat 'S', kleur 'Zwart' wordt gereserveerd (bv. de beschikbare voorraad wordt 3, en een aparte 'gereserveerde' teller wordt 2).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-013-2",
+      "reqId": "REQ-013",
+      "given": "Een bestelling met gereserveerde voorraad voor product 'prod-111', maat 'S', kleur 'Zwart' (2 stuks) wordt succesvol betaald.",
+      "when": "De betalingswebhook voor de bestelling wordt ontvangen.",
+      "then": "De definitieve voorraad voor product 'prod-111', maat 'S', kleur 'Zwart' wordt verminderd met 2 (van 3 naar 1).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-013-3",
+      "reqId": "REQ-013",
+      "given": "Een bestelling met gereserveerde voorraad voor product 'prod-222', maat 'M', kleur 'Blauw' (1 stuk) wordt geannuleerd of de betaling mislukt.",
+      "when": "De betalingswebhook voor de bestelling wordt niet ontvangen of is een mislukte callback.",
+      "then": "De gereserveerde voorraad voor product 'prod-222', maat 'M', kleur 'Blauw' wordt vrijgegeven (de voorraad keert terug naar de oorspronkelijke waarde v\u00f3\u00f3r reservering).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-014-1",
+      "reqId": "REQ-014",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-xyz'.",
+      "when": "De gebruiker navigeert naar de bestelgeschiedenis.",
+      "then": "De gebruiker kan de details van bestelling 'order-xyz' bekijken.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-014-2",
+      "reqId": "REQ-014",
+      "given": "De gebruiker is ingelogd.",
+      "when": "De gebruiker probeert toegang te krijgen tot een admin-specifiek order endpoint (bv. het wijzigen van een orderstatus).",
+      "then": "De API retourneert een HTTP 403 statuscode (Forbidden) of 401 (Unauthorized) indien niet ingelogd.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-015-1",
+      "reqId": "REQ-015",
+      "given": "De gebruiker is ingelogd met de rol 'Admin'.",
+      "when": "De gebruiker probeert toegang te krijgen tot het endpoint POST /api/admin/clothes.",
+      "then": "De API retourneert een HTTP 201 statuscode met de verwachte response.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-015-2",
+      "reqId": "REQ-015",
+      "given": "De gebruiker is ingelogd met de rol 'USER'.",
+      "when": "De gebruiker probeert toegang te krijgen tot het endpoint POST /api/admin/clothes.",
+      "then": "De API retourneert een HTTP 403 statuscode (Forbidden).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-015-3",
+      "reqId": "REQ-015",
+      "given": "De gebruiker is niet ingelogd.",
+      "when": "De gebruiker probeert toegang te krijgen tot het endpoint POST /api/admin/clothes.",
+      "then": "De API retourneert een HTTP 401 statuscode (Unauthorized).",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-016-1",
+      "reqId": "REQ-016",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-del-1' die 5 dagen geleden geleverd is.",
+      "when": "De gebruiker dient een retouraanvraag in voor bestelling 'order-del-1'.",
+      "then": "De API POST /api/returns met orderId 'order-del-1' retourneert een HTTP 201 statuscode.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-016-2",
+      "reqId": "REQ-016",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-del-2' die 15 dagen geleden geleverd is.",
+      "when": "De gebruiker probeert een retouraanvraag in te dienen voor bestelling 'order-del-2'.",
+      "then": "De API POST /api/returns met orderId 'order-del-2' retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat de retourtermijn is verstreken.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-016-3",
+      "reqId": "REQ-016",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-not-del' die nog niet geleverd is.",
+      "when": "De gebruiker probeert een retouraanvraag in te dienen voor bestelling 'order-not-del'.",
+      "then": "De API POST /api/returns met orderId 'order-not-del' retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat een retour alleen mogelijk is voor geleverde bestellingen.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-017-1",
+      "reqId": "REQ-017",
+      "given": "Er zijn actieve kledingproducten beschikbaar in de database.",
+      "when": "De gebruiker navigeert naar de productoverzichtspagina.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lijst van kledingproducten, waarbij elk product minimaal een 'id', 'name', 'price' en 'category' bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-017-2",
+      "reqId": "REQ-017",
+      "given": "Er zijn geen actieve kledingproducten beschikbaar in de database.",
+      "when": "De gebruiker navigeert naar de productoverzichtspagina.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lege lijst van kledingproducten.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-018-1",
+      "reqId": "REQ-018",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op categorie 'Tops' en maat 'M'.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lijst van kledingproducten die voldoen aan de filtercriteria (categorie 'Tops' en maat 'M').",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-018-2",
+      "reqId": "REQ-018",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op prijsbereik van \u20ac20 tot \u20ac50.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lijst van kledingproducten waarvan de prijs tussen \u20ac20 en \u20ac50 (inclusief) ligt.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-018-3",
+      "reqId": "REQ-018",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op een niet-bestaande categorie 'Schoenen'.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lege lijst van kledingproducten.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-018-4",
+      "reqId": "REQ-018",
+      "given": "Er zijn kledingproducten met verschillende categorie\u00ebn, maten, kleuren en prijzen beschikbaar.",
+      "when": "De gebruiker past een filter toe op een maat die niet beschikbaar is voor enig product, bijvoorbeeld 'XXL'.",
+      "then": "De API GET /api/clothes retourneert een HTTP 200 statuscode met een lege lijst van kledingproducten.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-019-1",
+      "reqId": "REQ-019",
+      "given": "Er is een specifiek kledingproduct met ID 'prod-123' beschikbaar in de database met voorraad.",
+      "when": "De gebruiker klikt op het kledingproduct met ID 'prod-123' in het overzicht.",
+      "then": "De API GET /api/clothes/prod-123 retourneert een HTTP 200 statuscode met een 'ClothingItemDetailResponse' die de 'id', 'name', 'description', 'price', 'availableSizes', 'availableColors' en 'inventory' van het product bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-019-2",
+      "reqId": "REQ-019",
+      "given": "Er is geen kledingproduct met ID 'prod-999' in de database.",
+      "when": "De gebruiker probeert de detailpagina te openen voor een niet-bestaand product met ID 'prod-999'.",
+      "then": "De API GET /api/clothes/prod-999 retourneert een HTTP 404 statuscode met een 'ApiError'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-019-3",
+      "reqId": "REQ-019",
+      "given": "Er is een specifiek kledingproduct met ID 'prod-456' beschikbaar in de database, maar de voorraad voor alle maten is 0.",
+      "when": "De gebruiker bekijkt de detailpagina van product 'prod-456'.",
+      "then": "De 'inventory' velden voor alle maten van product 'prod-456' tonen een voorraadstatus van 0.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-020-1",
+      "reqId": "REQ-020",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw' en heeft een voorraad van minimaal 1.",
+      "when": "De gebruiker selecteert maat 'L', kleur 'Blauw' voor product 'prod-789' en klikt op 'Toevoegen aan winkelmandje'.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-789', 'size': 'L', 'color': 'Blauw', 'quantity': 1} retourneert een HTTP 201 statuscode met een 'CartItemResponse' die het toegevoegde item bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-020-2",
+      "reqId": "REQ-020",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw', maar de voorraad is 0.",
+      "when": "De gebruiker selecteert maat 'L', kleur 'Blauw' voor product 'prod-789' en probeert op 'Toevoegen aan winkelmandje' te klikken.",
+      "then": "De knop 'Toevoegen aan winkelmandje' is disabled.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-020-3",
+      "reqId": "REQ-020",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw' en heeft een voorraad van 1.",
+      "when": "De gebruiker selecteert maat 'L', kleur 'Blauw' voor product 'prod-789' en klikt op 'Toevoegen aan winkelmandje' twee keer.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-789', 'size': 'L', 'color': 'Blauw', 'quantity': 1} wordt twee keer aangeroepen, en de bestaande cart item wordt ge\u00fcpdatet naar quantity 2.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-020-4",
+      "reqId": "REQ-020",
+      "given": "De gebruiker is ingelogd en het product 'prod-789' is beschikbaar met maat 'L' en kleur 'Blauw' en heeft een voorraad van 1.",
+      "when": "De gebruiker probeert maat 'XL' toe te voegen aan het winkelmandje voor product 'prod-789', terwijl maat 'XL' niet beschikbaar is.",
+      "then": "De API POST /api/cart/items met body {'clothingItemId': 'prod-789', 'size': 'XL', 'color': 'Blauw', 'quantity': 1} retourneert een HTTP 404 of 409 statuscode met een 'ApiError'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-021-1",
+      "reqId": "REQ-021",
+      "given": "De gebruiker is ingelogd en heeft minimaal \u00e9\u00e9n item in het winkelmandje.",
+      "when": "De gebruiker doorloopt het checkout proces, vult geldige verzendgegevens in, selecteert een betaalmethode en bevestigt de bestelling.",
+      "then": "De API POST /api/orders met geldige verzendgegevens en betaalmethode retourneert een HTTP 201 statuscode met een 'OrderResponse' die de 'id', 'status' (initieel 'PENDING'), 'totalPrice' en 'shippingAddress' van de bestelling bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-021-2",
+      "reqId": "REQ-021",
+      "given": "De gebruiker is ingelogd en heeft minimaal \u00e9\u00e9n item in het winkelmandje.",
+      "when": "De gebruiker probeert het checkout proces te doorlopen zonder verzendgegevens in te vullen.",
+      "then": "De API POST /api/orders retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat verzendgegevens verplicht zijn.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-021-3",
+      "reqId": "REQ-021",
+      "given": "De gebruiker is ingelogd en heeft minimaal \u00e9\u00e9n item in het winkelmandje.",
+      "when": "De gebruiker probeert het checkout proces te doorlopen met een ongeldige betaalmethode.",
+      "then": "De API POST /api/orders retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat de betaalmethode ongeldig is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-021-4",
+      "reqId": "REQ-021",
+      "given": "De gebruiker is ingelogd en het winkelmandje is leeg.",
+      "when": "De gebruiker probeert het checkout proces te starten.",
+      "then": "De checkout functionaliteit is niet toegankelijk of de API POST /api/orders retourneert een HTTP 400 statuscode met een 'ApiError' die aangeeft dat het winkelmandje leeg is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-022-1",
+      "reqId": "REQ-022",
+      "given": "De gebruiker is ingelogd en heeft eerder bestellingen geplaatst.",
+      "when": "De gebruiker navigeert naar de bestelgeschiedenispagina.",
+      "then": "De API GET /api/orders/me retourneert een HTTP 200 statuscode met een 'OrderListResponse' die een lijst van de bestellingen van de gebruiker bevat, inclusief 'id', 'createdAt', 'status' en 'totalPrice'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-022-2",
+      "reqId": "REQ-022",
+      "given": "De gebruiker is ingelogd en heeft nog geen bestellingen geplaatst.",
+      "when": "De gebruiker navigeert naar de bestelgeschiedenispagina.",
+      "then": "De API GET /api/orders/me retourneert een HTTP 200 statuscode met een lege 'OrderListResponse'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-022-3",
+      "reqId": "REQ-022",
+      "given": "De gebruiker is ingelogd en heeft een bestelling met ID 'order-abc' met status 'PENDING'.",
+      "when": "De gebruiker bekijkt de details van bestelling 'order-abc' in de bestelgeschiedenis.",
+      "then": "De status van bestelling 'order-abc' wordt correct weergegeven als 'PENDING'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-023-1",
+      "reqId": "REQ-023",
+      "given": "De applicatie wordt geopend op een desktop browser.",
+      "when": "De gebruiker navigeert door de productcatalogus en bekijkt productdetails.",
+      "then": "De layout van de pagina past zich correct aan de desktop resolutie aan, met alle elementen goed zichtbaar en bruikbaar.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-023-2",
+      "reqId": "REQ-023",
+      "given": "De applicatie wordt geopend op een tablet browser.",
+      "when": "De gebruiker navigeert door de productcatalogus en bekijkt productdetails.",
+      "then": "De layout van de pagina past zich correct aan de tablet resolutie aan, met alle elementen goed zichtbaar en bruikbaar.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-023-3",
+      "reqId": "REQ-023",
+      "given": "De applicatie wordt geopend op een mobiele browser.",
+      "when": "De gebruiker navigeert door de productcatalogus en bekijkt productdetails.",
+      "then": "De layout van de pagina past zich correct aan de mobiele resolutie aan, met alle elementen goed zichtbaar en bruikbaar.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-024-1",
+      "reqId": "REQ-024",
+      "given": "Een gebruiker registreert zich met een nieuw wachtwoord.",
+      "when": "Het registratieproces wordt voltooid.",
+      "then": "Het wachtwoord van de gebruiker wordt gehasht opgeslagen in de database, niet in platte tekst.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-024-2",
+      "reqId": "REQ-024",
+      "given": "Een gebruiker logt in met een bestaand wachtwoord.",
+      "when": "Het login proces wordt uitgevoerd.",
+      "then": "Het ingevoerde wachtwoord wordt gehasht en vergeleken met de gehashte waarde in de database, zonder het originele wachtwoord te onthullen.",
+      "testType": "integration"
+    }
+  ],
+  "traceability": [
+    {
+      "reqId": "REQ-001",
+      "backendRefs": [
+        "ClothingItemController",
+        "ClothingItemService",
+        "ClothingItemRepository"
+      ],
+      "frontendRefs": [
+        "HomePage",
+        "ProductList"
+      ],
+      "testRefs": [
+        "Verifieer dat de productlijst op de homepage en productpagina actieve kledingproducten toont."
+      ]
+    },
+    {
+      "reqId": "REQ-002",
+      "backendRefs": [
+        "ClothingItemController",
+        "ClothingItemService"
+      ],
+      "frontendRefs": [
+        "ProductFilter"
+      ],
+      "testRefs": [
+        "Test filtering op categorie, maat, kleur, prijs en beschikbaarheid op de productpagina."
+      ]
+    },
+    {
+      "reqId": "REQ-003",
+      "backendRefs": [
+        "ClothingItemController",
+        "ClothingItemService",
+        "ClothingItemRepository"
+      ],
+      "frontendRefs": [
+        "ProductDetailPage"
+      ],
+      "testRefs": [
+        "Controleer of de productdetailpagina correcte prijs, beschrijving, beschikbare maten en voorraadstatus toont."
+      ]
+    },
+    {
+      "reqId": "REQ-004",
+      "backendRefs": [
+        "CartController",
+        "CartService",
+        "CartItemRepository",
+        "ClothingItemService",
+        "InventoryService"
+      ],
+      "frontendRefs": [
+        "ProductDetailPage",
+        "AddToCartForm"
+      ],
+      "testRefs": [
+        "Valideer dat een product met gekozen maat en kleur succesvol aan het winkelmandje kan worden toegevoegd."
+      ]
+    },
+    {
+      "reqId": "REQ-005",
+      "backendRefs": [
+        "OrderController",
+        "OrderService",
+        "PaymentController",
+        "PaymentService",
+        "AddressService"
+      ],
+      "frontendRefs": [
+        "CheckoutPage",
+        "ShippingForm",
+        "OrderSummary",
+        "PaymentForm",
+        "PlaceOrderButton"
+      ],
+      "testRefs": [
+        "Test het volledige checkoutproces inclusief verzendgegevens, orderoverzicht en betalingsmethode."
+      ]
+    },
+    {
+      "reqId": "REQ-006",
+      "backendRefs": [
+        "OrderController",
+        "OrderService",
+        "OrderRepository"
+      ],
+      "frontendRefs": [
+        "OrderHistoryPage",
+        "OrderList",
+        "OrderItem"
+      ],
+      "testRefs": [
+        "Controleer of de klant zijn bestelgeschiedenis en de status van zijn bestellingen kan bekijken."
+      ]
+    },
+    {
+      "reqId": "REQ-007",
+      "backendRefs": [
+        "ClothingItemController",
+        "CategoryController",
+        "OrderController",
+        "ClothingItemService",
+        "CategoryService",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "AdminProductListPage",
+        "AdminProductTable",
+        "AdminAddProductPage",
+        "AdminEditProductPage",
+        "AdminOrderListPage",
+        "AdminOrderTable"
+      ],
+      "testRefs": [
+        "Verifieer dat de admin producten, categorie\u00ebn en orders kan beheren via de admin interface."
+      ]
+    },
+    {
+      "reqId": "REQ-008",
+      "backendRefs": [
+        "OrderController",
+        "OrderService",
+        "ReturnController",
+        "ReturnService"
+      ],
+      "frontendRefs": [
+        "AdminOrderDetailPage",
+        "UpdateOrderStatusForm"
+      ],
+      "testRefs": [
+        "Test of de admin bestellingen kan openen en retouraanvragen kan aanmaken."
+      ]
+    },
+    {
+      "reqId": "REQ-009",
+      "backendRefs": [
+        "ReturnController",
+        "ReturnService",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "OrderHistoryPage",
+        "OrderItem",
+        "ReturnRequestForm"
+      ],
+      "testRefs": [
+        "Valideer dat een klant een retouraanvraag kan indienen voor een geleverde bestelling."
+      ]
+    },
+    {
+      "reqId": "REQ-010",
+      "backendRefs": [
+        "OrderService",
+        "InventoryService",
+        "ClothingItemValidator"
+      ],
+      "frontendRefs": [],
+      "testRefs": [
+        "Test dat een product niet besteld kan worden als de gekozen maat niet op voorraad is."
+      ]
+    },
+    {
+      "reqId": "REQ-011",
+      "backendRefs": [
+        "ClothingItemController",
+        "InventoryService"
+      ],
+      "frontendRefs": [
+        "ProductDetailPage",
+        "AddToCartForm"
+      ],
+      "testRefs": [
+        "Controleer of de 'Toevoegen aan winkelmand' knop disabled is wanneer de gekozen maat/kleur niet beschikbaar is."
+      ]
+    },
+    {
+      "reqId": "REQ-012",
+      "backendRefs": [
+        "OrderService",
+        "PaymentService"
+      ],
+      "frontendRefs": [],
+      "testRefs": [
+        "Verifieer dat een bestelling de status 'Pending' krijgt en pas 'Paid' wordt na een succesvolle webhook van de betalingsprovider."
+      ]
+    },
+    {
+      "reqId": "REQ-013",
+      "backendRefs": [
+        "OrderService",
+        "InventoryService",
+        "PaymentService"
+      ],
+      "frontendRefs": [],
+      "testRefs": [
+        "Test dat voorraad wordt gereserveerd bij ordercreatie en definitief verminderd na succesvolle betaling."
+      ]
+    },
+    {
+      "reqId": "REQ-014",
+      "backendRefs": [
+        "OrderController",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "OrderHistoryPage"
+      ],
+      "testRefs": [
+        "Controleer of klanten alleen hun eigen bestellingen kunnen bekijken."
+      ]
+    },
+    {
+      "reqId": "REQ-015",
+      "backendRefs": [
+        "SecurityConfig",
+        "JwtTokenProvider",
+        "AuthController"
+      ],
+      "frontendRefs": [
+        "LoginPage",
+        "RegisterPage"
+      ],
+      "testRefs": [
+        "Test dat admin endpoints alleen toegankelijk zijn voor gebruikers met de rol Admin."
+      ]
+    },
+    {
+      "reqId": "REQ-016",
+      "backendRefs": [
+        "ReturnService",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "OrderHistoryPage",
+        "OrderItem",
+        "ReturnRequestForm"
+      ],
+      "testRefs": [
+        "Valideer dat retouraanvragen alleen mogelijk zijn voor bestellingen met status 'Delivered' en binnen 14 dagen na levering."
+      ]
+    },
+    {
+      "reqId": "REQ-017",
+      "backendRefs": [
+        "ClothingItemController",
+        "ClothingItemService",
+        "ClothingItemRepository"
+      ],
+      "frontendRefs": [
+        "HomePage",
+        "ProductList"
+      ],
+      "testRefs": [
+        "Verifieer dat de productlijst op de homepage en productpagina actieve kledingproducten toont."
+      ]
+    },
+    {
+      "reqId": "REQ-018",
+      "backendRefs": [
+        "ClothingItemController",
+        "ClothingItemService"
+      ],
+      "frontendRefs": [
+        "ProductFilter"
+      ],
+      "testRefs": [
+        "Test filtering op categorie, maat, kleur, prijs en beschikbaarheid op de productpagina."
+      ]
+    },
+    {
+      "reqId": "REQ-019",
+      "backendRefs": [
+        "ClothingItemController",
+        "ClothingItemService",
+        "ClothingItemRepository"
+      ],
+      "frontendRefs": [
+        "ProductDetailPage"
+      ],
+      "testRefs": [
+        "Controleer of de productdetailpagina correcte prijs, beschrijving, beschikbare maten en voorraadstatus toont."
+      ]
+    },
+    {
+      "reqId": "REQ-020",
+      "backendRefs": [
+        "CartController",
+        "CartService",
+        "CartItemRepository",
+        "ClothingItemService",
+        "InventoryService"
+      ],
+      "frontendRefs": [
+        "ProductDetailPage",
+        "AddToCartForm"
+      ],
+      "testRefs": [
+        "Valideer dat een product met gekozen maat en kleur succesvol aan het winkelmandje kan worden toegevoegd."
+      ]
+    },
+    {
+      "reqId": "REQ-021",
+      "backendRefs": [
+        "OrderController",
+        "OrderService",
+        "PaymentController",
+        "PaymentService",
+        "AddressService"
+      ],
+      "frontendRefs": [
+        "CheckoutPage",
+        "ShippingForm",
+        "OrderSummary",
+        "PaymentForm",
+        "PlaceOrderButton"
+      ],
+      "testRefs": [
+        "Test het volledige checkoutproces inclusief verzendgegevens, orderoverzicht en betalingsmethode."
+      ]
+    },
+    {
+      "reqId": "REQ-022",
+      "backendRefs": [
+        "OrderController",
+        "OrderService",
+        "OrderRepository"
+      ],
+      "frontendRefs": [
+        "OrderHistoryPage",
+        "OrderList",
+        "OrderItem"
+      ],
+      "testRefs": [
+        "Controleer of de klant zijn bestelgeschiedenis en de status van zijn bestellingen kan bekijken."
+      ]
+    },
+    {
+      "reqId": "REQ-023",
+      "backendRefs": [],
+      "frontendRefs": [
+        "HomePage",
+        "ProductList",
+        "ProductDetailPage",
+        "CartPage",
+        "CheckoutPage",
+        "OrderHistoryPage",
+        "LoginPage",
+        "RegisterPage"
+      ],
+      "testRefs": [
+        "Test de responsiviteit van de applicatie op desktop, tablet en mobiele apparaten."
+      ]
+    },
+    {
+      "reqId": "REQ-024",
+      "backendRefs": [
+        "PasswordHasher",
+        "AuthService",
+        "UserRepository"
+      ],
+      "frontendRefs": [
+        "RegisterPage",
+        "LoginPage"
+      ],
+      "testRefs": [
+        "Verifieer dat wachtwoorden gehasht worden opgeslagen in de database."
+      ]
+    }
+  ]
+}
