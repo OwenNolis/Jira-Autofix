@@ -1,0 +1,297 @@
+name: Feature Validation (Copilot)
+
+# Triggered by PR comments starting with /copilot-validate-feature-
+# Two modes:
+#   /copilot-validate-feature-012            → validate changed files only (default)
+#   /copilot-validate-feature-012 --changed  → validate changed files only (explicit)
+#   /copilot-validate-feature-012 --full     → validate entire codebase
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  models: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    # Only run on PR comments that start with /copilot-validate-feature-
+    if: |
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/copilot-validate-feature-')
+
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+
+          # Extract feature number/id from comment, e.g. /copilot-validate-feature-012
+          FEATURE_NUM="$(echo "$COMMENT" | grep -oP '(?<=/copilot-validate-feature-)\S+' | sed 's/--.*$//' | tr -d ' ')"
+          echo "Detected feature token: $FEATURE_NUM"
+
+          # Detect mode
+          if echo "$COMMENT" | grep -q '\-\-full'; then
+            MODE="full"
+          else
+            MODE="changed"
+          fi
+
+          echo "feature_num=$FEATURE_NUM" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE"               >> "$GITHUB_OUTPUT"
+          echo "Mode: $MODE"
+
+      - name: Post "working on it" reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST \
+            "/repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content='+1' || true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve FA and TA paths
+        id: docs
+        env:
+          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+        run: |
+          set -euo pipefail
+
+          FA_PATH="$(find docs/functional-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+          TA_PATH="$(find docs/technical-analysis  -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+
+          if [ -z "$FA_PATH" ]; then
+            echo "::error::FA not found for feature-${FEATURE_NUM} in docs/functional-analysis/"
+            exit 1
+          fi
+          if [ -z "$TA_PATH" ]; then
+            echo "::error::TA not found for feature-${FEATURE_NUM} in docs/technical-analysis/"
+            exit 1
+          fi
+
+          echo "fa_path=$FA_PATH" >> "$GITHUB_OUTPUT"
+          echo "ta_path=$TA_PATH" >> "$GITHUB_OUTPUT"
+          echo "FA: $FA_PATH"
+          echo "TA: $TA_PATH"
+
+      - name: Get PR changed files
+        id: pr_files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          MODE: ${{ steps.parse.outputs.mode }}
+        run: |
+          set -euo pipefail
+
+          CHANGED_FILES="$(gh api \
+            "/repos/${REPO}/pulls/${PR_NUMBER}/files" \
+            --paginate \
+            --jq '.[].filename' 2>/dev/null || true)"
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          DIFF_CONTENT=""
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              EXT="${file##*.}"
+              case "$EXT" in
+                java|ts|tsx|js|jsx|sql|yaml|yml|json|xml|properties)
+                  DIFF_CONTENT="${DIFF_CONTENT}\n\n### File: ${file}\n\`\`\`\n$(cat "$file" | head -200)\n\`\`\`"
+                  ;;
+              esac
+            fi
+          done <<< "$CHANGED_FILES"
+
+          printf "%b" "$DIFF_CONTENT" > /tmp/code_context.txt
+
+          if [ "$MODE" = "full" ]; then
+            find backend/src/main -name "*.java" 2>/dev/null | while read -r f; do
+              printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
+              head -150 "$f"                            >> /tmp/code_context.txt
+              printf '\n```\n'                          >> /tmp/code_context.txt
+            done
+            find frontend/src \( -name "*.tsx" -o -name "*.ts" \) 2>/dev/null | while read -r f; do
+              printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
+              head -150 "$f"                                  >> /tmp/code_context.txt
+              printf '\n```\n'                                >> /tmp/code_context.txt
+            done
+          fi
+
+          echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED_FILES"     >> "$GITHUB_OUTPUT"
+          echo "EOF"                >> "$GITHUB_OUTPUT"
+
+      - name: Run Copilot feature validation
+        id: validation
+        env:
+          GH_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_MODEL: ${{ vars.COPILOT_VALIDATION_MODEL }}
+          FA_PATH:     ${{ steps.docs.outputs.fa_path }}
+          TA_PATH:     ${{ steps.docs.outputs.ta_path }}
+          MODE:        ${{ steps.parse.outputs.mode }}
+          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+          PR_NUMBER:   ${{ github.event.issue.number }}
+          REPO:        ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          MODEL="${COPILOT_MODEL:-gpt-4o}"
+
+          FA_CONTENT="$(cat "$FA_PATH")"
+          TA_CONTENT="$(cat "$TA_PATH")"
+          CODE_CONTEXT="$(cat /tmp/code_context.txt | head -c 80000)"
+
+          PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
+          PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
+
+          MODE_LABEL="changed files only"
+          [ "$MODE" = "full" ] && MODE_LABEL="full codebase"
+
+          PROMPT="You are an expert software engineer doing a feature compliance review.
+
+          You are given:
+          1. A Functional Analysis (FA) document describing the feature requirements
+          2. A Technical Analysis (TA) document describing the technical design
+          3. Code context from the PR (${MODE_LABEL})
+
+          Your task: validate whether the PR code correctly implements the feature described in the FA and TA.
+
+          ═══════════════════════════════════════
+          FUNCTIONAL ANALYSIS (FA)
+          ═══════════════════════════════════════
+          ${FA_CONTENT}
+
+          ═══════════════════════════════════════
+          TECHNICAL ANALYSIS (TA)
+          ═══════════════════════════════════════
+          ${TA_CONTENT}
+
+          ═══════════════════════════════════════
+          CODE CONTEXT (${MODE_LABEL})
+          ═══════════════════════════════════════
+          PR Title: ${PR_TITLE}
+          PR Description: ${PR_BODY}
+
+          ${CODE_CONTEXT}
+
+          ═══════════════════════════════════════
+          VALIDATION INSTRUCTIONS
+          ═══════════════════════════════════════
+          Write a structured Markdown validation report with these exact sections:
+
+          ## 📋 FA Validation
+
+          ### Requirements
+          For each REQ-xxx found in the FA: ✅ implemented / ❌ missing / ⚠️ partial — with a short reason.
+
+          ### Business Rules
+          For each BR-xxx found in the FA: ✅ enforced / ❌ missing / ⚠️ partial — with a short reason.
+
+          ### Acceptance Criteria
+          For each AC-xxx found in the FA: ✅ covered / ❌ not covered / ⚠️ partial — with a short reason.
+
+          ### Non-Functional Requirements
+          For each NFR-xxx found in the FA: ✅ addressed / ❌ missing / ⚠️ partial — with a short reason.
+
+          ## 🔧 TA Validation
+
+          ### API Contracts
+          Check if the implemented endpoints match the TA (paths, methods, request/response structure, status codes).
+          List each endpoint: ✅ correct / ❌ wrong / ⚠️ partial.
+
+          ### Domain Model & Database
+          Check if entities, fields, constraints and relations match the TA domain model and ERD.
+          List findings per entity.
+
+          ### Backend Design
+          Check if the controller/service/repository structure matches the TA backend design.
+
+          ### Frontend Design
+          Check if components and routes match the TA frontend design (if applicable to this PR).
+
+          ## 📊 Summary
+
+          | Category | ✅ OK | ⚠️ Partial | ❌ Missing |
+          |----------|-------|-----------|---------|
+          | Requirements | X | X | X |
+          | Business Rules | X | X | X |
+          | Acceptance Criteria | X | X | X |
+          | NFR | X | X | X |
+          | API Contracts | X | X | X |
+          | Domain Model | X | X | X |
+
+          ## 🏁 Verdict
+
+          **PASS** / **PARTIAL** / **FAIL** — one sentence overall conclusion.
+
+          Important rules:
+          - Be specific: reference exact REQ/BR/AC/NFR numbers and exact field/endpoint names
+          - If code is not available for a check, mark it as ⚠️ and state why
+          - Do NOT invent requirements — only validate against what is written in FA and TA
+          - Keep each bullet concise (1 line max)"
+
+          # GitHub Models uses the OpenAI-compatible chat completions format
+          REQUEST_JSON="$(jq -n --arg model "$MODEL" --arg prompt "$PROMPT" '{
+            model: $model,
+            messages: [{ role: "user", content: $prompt }],
+            temperature: 0,
+            max_tokens: 8192
+          }')"
+
+          HTTP_CODE="$(curl -sS -o /tmp/copilot.json -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://models.inference.ai.azure.com/chat/completions" \
+            -d "$REQUEST_JSON" || true)"
+
+          echo "GitHub Models HTTP status: $HTTP_CODE"
+          cat /tmp/copilot.json
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            REPORT="$(jq -r '.choices[0].message.content // ""' /tmp/copilot.json)"
+          else
+            REPORT="⚠️ GitHub Models API call failed (HTTP $HTTP_CODE). Please retry the validation command."
+          fi
+
+          # Write the final PR comment
+          {
+            echo "## 🔍 Feature Validation (Copilot) — \`feature-${FEATURE_NUM}\`"
+            echo
+            echo "> **Mode:** ${MODE_LABEL} | **Model:** ${MODEL}"
+            echo
+            echo "$REPORT"
+            echo
+            echo "---"
+            echo "_Validation triggered by @${{ github.event.comment.user.login }} · $(date -u '+%Y-%m-%d %H:%M UTC')_"
+          } > /tmp/validation-report.md
+
+          gh pr comment "$PR_NUMBER" --body-file /tmp/validation-report.md
+
+      - name: Handle docs not found
+        if: failure() && steps.docs.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "❌ **Feature Validation (Copilot) failed** — could not find FA or TA documents for \`feature-${FEATURE_NUM}\`.
+
+          Make sure these files exist:
+          - \`docs/functional-analysis/feature-${FEATURE_NUM}*.md\`
+          - \`docs/technical-analysis/feature-${FEATURE_NUM}*.md\`" || true
