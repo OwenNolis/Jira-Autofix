@@ -269,7 +269,14 @@ jobs:
             echo "- Output nothing before or after the JSON object"
           } > copilot-prompt.txt
           
-          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines)"
+          PROMPT_BYTES=$(wc -c < copilot-prompt.txt)
+          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines, ${PROMPT_BYTES} bytes)"
+          if [ "$PROMPT_BYTES" -gt 1500000 ]; then
+            echo "::error::Prompt exceeds 1.5MB (${PROMPT_BYTES} bytes) — too large for the model context window"
+            exit 1
+          elif [ "$PROMPT_BYTES" -gt 600000 ]; then
+            echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — consider reducing included files"
+          fi
 
       - name: Cache Copilot CLI
         uses: actions/cache@v4
@@ -287,19 +294,27 @@ jobs:
 
       - name: Run Copilot and capture output
         id: ai_fix
+        timeout-minutes: 60
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
+          # Cap output at 5MB to guard against runaway responses
           copilot -p "$(cat copilot-prompt.txt)" \
             --model "$COPILOT_MODEL" \
             --no-ask-user \
-            2>&1 | tee /tmp/copilot-output.log
-          
+            2>&1 | head -c 5242880 | tee /tmp/copilot-output.log
+
           if [ "${PIPESTATUS[0]}" -ne 0 ]; then
             echo "::error::Copilot CLI failed — check COPILOT_PAT secret and CLI flags"
             exit 1
           fi
-          
+
+          OUTPUT_BYTES=$(wc -c < /tmp/copilot-output.log)
+          echo "Output size: ${OUTPUT_BYTES} bytes"
+          if [ "$OUTPUT_BYTES" -ge 5242880 ]; then
+            echo "::warning::Output was truncated at 5MB — response may be incomplete"
+          fi
+
           echo "=== Raw Copilot output ==="
           cat /tmp/copilot-output.log
 
