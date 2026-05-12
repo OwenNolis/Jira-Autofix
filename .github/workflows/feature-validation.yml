@@ -1,10 +1,10 @@
 name: Feature Validation (Copilot)
 
-# Triggered by PR comments starting with /copilot-validate-feature-
+# Triggered by PR comments starting with /validate-feature-
 # Two modes:
-#   /copilot-validate-feature-012            → validate changed files only (default)
-#   /copilot-validate-feature-012 --changed  → validate changed files only (explicit)
-#   /copilot-validate-feature-012 --full     → validate entire codebase
+#   /validate-feature-012            → validate changed files only (default)
+#   /validate-feature-012 --changed  → validate changed files only (explicit)
+#   /validate-feature-012 --full     → validate entire codebase
 
 on:
   issue_comment:
@@ -20,10 +20,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
 
-    # Only run on PR comments that start with /copilot-validate-feature-
+    # Only run on PR comments that start with /validate-feature-
     if: |
       github.event.issue.pull_request != null &&
-      startsWith(github.event.comment.body, '/copilot-validate-feature-')
+      startsWith(github.event.comment.body, '/validate-feature-')
 
     steps:
       - name: Parse command
@@ -33,8 +33,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Extract feature number/id from comment, e.g. /copilot-validate-feature-012
-          FEATURE_NUM="$(echo "$COMMENT" | grep -oP '(?<=/copilot-validate-feature-)\S+' | sed 's/--.*$//' | tr -d ' ')"
+          # Extract feature number/id from comment, e.g. /validate-feature-012
+          FEATURE_NUM="$(echo "$COMMENT" | grep -oP '(?<=/validate-feature-)\S+' | sed 's/--.*$//' | tr -d ' ')"
           echo "Detected feature token: $FEATURE_NUM"
 
           # Detect mode
@@ -152,9 +152,10 @@ jobs:
 
           MODEL="${COPILOT_MODEL:-gpt-4o}"
 
-          FA_CONTENT="$(cat "$FA_PATH")"
-          TA_CONTENT="$(cat "$TA_PATH")"
-          CODE_CONTEXT="$(cat /tmp/code_context.txt | head -c 80000)"
+          # Truncate each section to keep total payload within the API request limit
+          FA_CONTENT="$(cat "$FA_PATH" | head -c 30000)"
+          TA_CONTENT="$(cat "$TA_PATH" | head -c 30000)"
+          CODE_CONTEXT="$(cat /tmp/code_context.txt | head -c 30000)"
 
           PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
           PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
