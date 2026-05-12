@@ -152,11 +152,11 @@ jobs:
 
           MODEL="${COPILOT_MODEL:-gpt-4o}"
 
-          # Truncate each section — FA+TA+code must stay well under 100KB total
+          # Truncate each section — TA file is 84KB so we cap aggressively to stay under API limits
           # head -c reads directly from the file — avoids the SIGPIPE broken pipe that cat | head causes
-          FA_CONTENT="$(head -c 20000 "$FA_PATH")"
-          TA_CONTENT="$(head -c 20000 "$TA_PATH")"
-          CODE_CONTEXT="$(head -c 20000 /tmp/code_context.txt)"
+          FA_CONTENT="$(head -c 8000 "$FA_PATH")"
+          TA_CONTENT="$(head -c 8000 "$TA_PATH")"
+          CODE_CONTEXT="$(head -c 8000 /tmp/code_context.txt)"
 
           PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
           PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
@@ -254,6 +254,8 @@ jobs:
             temperature: 0,
             max_tokens: 8192
           }')"
+
+          echo "Request JSON size: $(printf '%s' "$REQUEST_JSON" | wc -c) bytes"
 
           HTTP_CODE="$(curl -sS -o /tmp/copilot.json -w "%{http_code}" \
             -X POST \
