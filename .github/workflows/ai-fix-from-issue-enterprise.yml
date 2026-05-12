@@ -13,6 +13,9 @@ on:
         description: 'GitHub issue number to fix'
         required: true
 
+env:
+  COPILOT_MODEL: claude-sonnet-4-6   # Change this to switch the AI model (e.g. gpt-4.1, claude-sonnet-4-6)
+
 concurrency:
   group: ai-fix-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
   cancel-in-progress: true
@@ -282,7 +285,7 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           copilot -p "$(cat copilot-prompt.txt)" \
-            --model claude-sonnet-4-6 \
+            --model "$COPILOT_MODEL" \
             --no-ask-user \
             2>&1 | tee /tmp/copilot-output.log
           
@@ -450,8 +453,9 @@ jobs:
             --arg changed  "$CHANGED_FILES" \
             --arg jira_key "$JIRA_KEY" \
             --arg title   "$CLEAN_TITLE" \
+            --arg model   "$COPILOT_MODEL" \
             '(if $jira_key != "" then "## 🤖 AI-Generated Fix — Refs:" + $jira_key + " - " + $title else "## 🤖 AI-Generated Fix" end) +
-             "\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (claude-sonnet-4-6)" +
+             "\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (" + $model + ")" +
              (if $jira != "" then "\n" + $jira else "" end) +
              "\n\n### Analysis\n" + $analysis +
              "\n\n### Changed Files\n" + $changed +
