@@ -152,11 +152,11 @@ jobs:
 
           MODEL="${COPILOT_MODEL:-gpt-4o}"
 
-          # Truncate each section to keep total payload within the API request limit
+          # Truncate each section — FA+TA+code must stay well under 100KB total
           # head -c reads directly from the file — avoids the SIGPIPE broken pipe that cat | head causes
-          FA_CONTENT="$(head -c 30000 "$FA_PATH")"
-          TA_CONTENT="$(head -c 30000 "$TA_PATH")"
-          CODE_CONTEXT="$(head -c 30000 /tmp/code_context.txt)"
+          FA_CONTENT="$(head -c 20000 "$FA_PATH")"
+          TA_CONTENT="$(head -c 20000 "$TA_PATH")"
+          CODE_CONTEXT="$(head -c 20000 /tmp/code_context.txt)"
 
           PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
           PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
