@@ -395,7 +395,6 @@ jobs:
           ISSUE_NUMBER: ${{ steps.resolve.outputs.number }}
           ISSUE_TITLE: ${{ steps.resolve.outputs.title }}
           JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
-          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
         run: |
           git config --global user.name "AI Issue Fixer"
           git config --global user.email "ai-fixer@github.com"
