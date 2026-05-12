@@ -299,12 +299,16 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           # Cap output at 5MB to guard against runaway responses
+          # || true suppresses the SIGPIPE error (exit 141) that head -c sends back
+          # to the copilot process when the limit is reached
           copilot -p "$(cat copilot-prompt.txt)" \
             --model "$COPILOT_MODEL" \
             --no-ask-user \
-            2>&1 | head -c 5242880 | tee /tmp/copilot-output.log
+            2>&1 | head -c 5242880 | tee /tmp/copilot-output.log || true
 
-          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+          COPILOT_EXIT=${PIPESTATUS[0]}
+          # 141 = 128+13 = SIGPIPE, expected when head -c truncates — not a real failure
+          if [ "$COPILOT_EXIT" -ne 0 ] && [ "$COPILOT_EXIT" -ne 141 ]; then
             echo "::error::Copilot CLI failed — check COPILOT_PAT secret and CLI flags"
             exit 1
           fi
