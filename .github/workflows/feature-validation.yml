@@ -163,7 +163,7 @@ jobs:
           if [ "$MODE" = "full" ]; then
             FA_CONTENT="$(head -c 4000 "$FA_PATH")"
             TA_CONTENT="$(head -c 4000 "$TA_PATH")"
-            CODE_CONTEXT="$(head -c 20000 /tmp/code_context.txt)"
+            CODE_CONTEXT="$(head -c 16000 /tmp/code_context.txt)"
           else
             FA_CONTENT="$(head -c 8000 "$FA_PATH")"
             TA_CONTENT="$(head -c 8000 "$TA_PATH")"
