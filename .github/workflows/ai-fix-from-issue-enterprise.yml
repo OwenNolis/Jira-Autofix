@@ -56,26 +56,6 @@ jobs:
           fi
           jq --version
 
-      - name: Resolve issue number and title
-        id: resolve
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            NUMBER="${{ github.event.inputs.issue_number }}"
-          else
-            NUMBER="${{ github.event.issue.number }}"
-          fi
-          
-          TITLE=$(curl -s \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${NUMBER}" \
-            | jq -r '.title // "Untitled"')
-          
-          echo "number=$NUMBER" >> $GITHUB_OUTPUT
-          echo "title=$TITLE" >> $GITHUB_OUTPUT
-
       - name: Acknowledge trigger (add 👀 reaction)
         if: github.event_name == 'issue_comment'
         env:
@@ -92,16 +72,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ISSUE_NUMBER="${{ steps.resolve.outputs.number }}"
-          
-          # Fetch full issue details
+          # Resolve issue number
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ISSUE_NUMBER="${{ github.event.inputs.issue_number }}"
+          else
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+          fi
+
+          # Fetch full issue details (single API call — replaces separate resolve step)
           ISSUE_JSON=$(curl -s \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}")
-          
+
           ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title // "Untitled"')
           ISSUE_BODY=$(echo "$ISSUE_JSON"  | jq -r '.body  // "No description."')
+
+          JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-key: )[A-Z][A-Z0-9]*-[0-9]+(?= -->)' || true)
+
+          echo "number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "title=$ISSUE_TITLE"   >> $GITHUB_OUTPUT
+          echo "jira_key=$JIRA_KEY"   >> $GITHUB_OUTPUT
 
           # Extract Jira issue type from the issue body table
           ISSUE_TYPE=$(echo "$ISSUE_BODY" | grep -i '| \*\*Type\*\*' | grep -oP '(?<=\| )[A-Za-z ]+(?= \|?\s*$)' | xargs || echo "Task")
@@ -247,15 +238,13 @@ jobs:
         if: steps.cache-copilot.outputs.cache-hit != 'true'
         run: curl -fsSL https://gh.io/copilot-install | bash
 
-      - name: Add Copilot CLI to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
       - name: Run Copilot and capture output
         id: ai_fix
         timeout-minutes: 60
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           # Cap output at 5MB to guard against runaway responses
           # || true suppresses the SIGPIPE error (exit 141) that head -c sends back
           # to the copilot process when the limit is reached
@@ -375,20 +364,14 @@ jobs:
         id: create_pr
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_PAT }}
-          ISSUE_NUMBER: ${{ steps.resolve.outputs.number }}
-          ISSUE_TITLE: ${{ steps.resolve.outputs.title }}
+          ISSUE_NUMBER: ${{ steps.build_prompt.outputs.number }}
+          ISSUE_TITLE: ${{ steps.build_prompt.outputs.title }}
           JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
         run: |
           git config --global user.name "AI Issue Fixer"
           git config --global user.email "ai-fixer@github.com"
           
-          # Read the Jira key from the issue body
-          ISSUE_BODY=$(curl -s \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" \
-            | jq -r '.body // ""')
-          JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-key: )[A-Z][A-Z0-9]*-[0-9]+(?= -->)' || true)
+          JIRA_KEY="${{ steps.build_prompt.outputs.jira_key }}"
           
           # Create a branch using the Jira key
           if [ -z "$JIRA_KEY" ]; then
@@ -486,7 +469,7 @@ jobs:
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.resolve.outputs.number }}/comments" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.build_prompt.outputs.number }}/comments" \
             -d "$COMMENT_JSON"
 
       - name: Comment when no changes were produced
@@ -497,6 +480,6 @@ jobs:
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.resolve.outputs.number }}/comments" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.build_prompt.outputs.number }}/comments" \
             -d '{"body":"🤖 **AI Analysis Complete** — No code changes were identified for this issue. Provide more detail or use `/fix-ai <extra context>` to give the AI more guidance."}'
  
