@@ -137,29 +137,22 @@ jobs:
           # exactly what packages are installed and can add new ones if needed
           true > /tmp/file_contents.txt
 
-          # Always include package.json files first
-          for pkgjson in $(git ls-files | grep 'package\.json' | grep -v node_modules); do
-            [ -f "$pkgjson" ] || continue
-            printf '### FILE: %s\n```\n' "$pkgjson" >> /tmp/file_contents.txt
-            cat "$pkgjson"                           >> /tmp/file_contents.txt
-            printf '\n```\n\n'                       >> /tmp/file_contents.txt
+          # package.json first — model must know available packages
+          git ls-files | grep 'package\.json' | grep -v node_modules | while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            { printf '### FILE: %s\n```\n' "$f"; cat "$f"; printf '\n```\n\n'; } >> /tmp/file_contents.txt
           done
 
-          # Include up to 80 source files ordered by most recently committed — Claude Sonnet 4.6
-          # has a 200K token context so we let the model's Step 1 analysis decide what's relevant
-          INCLUDED=0
-          while IFS= read -r file && [ "$INCLUDED" -lt 80 ]; do
-            [ -f "$file" ] || continue
-            printf '### FILE: %s\n```\n' "$file" >> /tmp/file_contents.txt
-            cat "$file"                          >> /tmp/file_contents.txt
-            printf '\n```\n\n'                   >> /tmp/file_contents.txt
-            INCLUDED=$((INCLUDED + 1))
-          done < <(git log --name-only --format="" \
+          # Up to 80 source files, most recently committed first
+          git log --name-only --format="" \
             | grep -E '\.(ts|tsx|js|jsx|css|scss)$' \
-            | awk '!seen[$0]++')
+            | awk '!seen[$0]++' \
+            | head -80 \
+            | while IFS= read -r f; do
+              [ -f "$f" ] || continue
+              { printf '### FILE: %s\n```\n' "$f"; cat "$f"; printf '\n```\n\n'; } >> /tmp/file_contents.txt
+            done
 
-          echo "Total source files included: $INCLUDED"
-          
           FILE_CONTENTS=$(cat /tmp/file_contents.txt)
 
           # Find real example file paths from the repo for the prompt
