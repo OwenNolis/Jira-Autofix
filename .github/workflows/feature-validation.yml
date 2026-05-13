@@ -152,11 +152,18 @@ jobs:
 
           MODEL="${COPILOT_MODEL:-gpt-4o}"
 
-          # Truncate each section — TA file is 84KB so we cap aggressively to stay under API limits
-          # head -c reads directly from the file — avoids the SIGPIPE broken pipe that cat | head causes
-          FA_CONTENT="$(head -c 8000 "$FA_PATH")"
-          TA_CONTENT="$(head -c 8000 "$TA_PATH")"
-          CODE_CONTEXT="$(head -c 8000 /tmp/code_context.txt)"
+          # --full mode gets more code context at the cost of smaller FA/TA excerpts
+          # --changed mode keeps larger FA/TA since code context is small anyway
+          # All values chosen to keep total request under ~28KB (empirical API limit)
+          if [ "$MODE" = "full" ]; then
+            FA_CONTENT="$(head -c 5000 "$FA_PATH")"
+            TA_CONTENT="$(head -c 5000 "$TA_PATH")"
+            CODE_CONTEXT="$(head -c 16000 /tmp/code_context.txt)"
+          else
+            FA_CONTENT="$(head -c 8000 "$FA_PATH")"
+            TA_CONTENT="$(head -c 8000 "$TA_PATH")"
+            CODE_CONTEXT="$(head -c 8000 /tmp/code_context.txt)"
+          fi
 
           PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
           PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
