@@ -153,8 +153,6 @@ jobs:
               { printf '### FILE: %s\n```\n' "$f"; cat "$f"; printf '\n```\n\n'; } >> /tmp/file_contents.txt
             done
 
-          FILE_CONTENTS=$(cat /tmp/file_contents.txt)
-
           # Find real example file paths from the repo for the prompt
           EXAMPLE_TS=$(git ls-files | grep -E '\.(tsx|ts)$' | grep -v node_modules | head -1 || echo "src/index.ts")
           EXAMPLE_CSS=$(git ls-files | grep -E '\.css$' | grep -v node_modules | head -1 || echo "src/index.css")
@@ -172,7 +170,7 @@ jobs:
             printf '```\n%s\n```\n' "${FILE_TREE}"
             echo ""
             echo "## Current Source Files (COMPLETE contents)"
-            echo "${FILE_CONTENTS}"
+            cat /tmp/file_contents.txt
             echo ""
             echo "## Step 1 — Analyse (think before you code)"
             echo "Before writing any code, reason through the following:"
@@ -230,11 +228,11 @@ jobs:
           
           PROMPT_BYTES=$(wc -c < copilot-prompt.txt)
           echo "Prompt written ($(wc -l < copilot-prompt.txt) lines, ${PROMPT_BYTES} bytes)"
-          if [ "$PROMPT_BYTES" -gt 1500000 ]; then
-            echo "::error::Prompt exceeds 1.5MB (${PROMPT_BYTES} bytes) — too large for the model context window"
+          if [ "$PROMPT_BYTES" -gt 800000 ]; then
+            echo "::error::Prompt exceeds 800KB (${PROMPT_BYTES} bytes) — too large for Claude Sonnet 4.6's 200K token context"
             exit 1
-          elif [ "$PROMPT_BYTES" -gt 600000 ]; then
-            echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — consider reducing included files"
+          elif [ "$PROMPT_BYTES" -gt 400000 ]; then
+            echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — approaching context limit, consider reducing included files"
           fi
 
       - name: Cache Copilot CLI
