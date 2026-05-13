@@ -120,16 +120,16 @@ jobs:
           done <<< "$CHANGED_FILES"
 
           if [ "$MODE" = "full" ]; then
-            find backend/src/main -name "*.java" 2>/dev/null | while read -r f; do
+            find . -path '*/backend/src/main' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
               printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
               head -150 "$f"                            >> /tmp/code_context.txt
               printf '\n```\n'                          >> /tmp/code_context.txt
-            done
-            find frontend/src \( -name "*.tsx" -o -name "*.ts" \) 2>/dev/null | while read -r f; do
+            done || true
+            find . -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
               printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
               head -150 "$f"                                  >> /tmp/code_context.txt
               printf '\n```\n'                                >> /tmp/code_context.txt
-            done
+            done || true
           fi
 
           echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
