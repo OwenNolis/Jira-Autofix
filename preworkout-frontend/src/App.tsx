@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
+import AdminPage from './pages/AdminPage';
 import CheckoutPage from './pages/CheckoutPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -24,6 +25,7 @@ export default function App() {
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/admin" element={<AdminPage />} />
             </Routes>
           </main>
         </CartProvider>

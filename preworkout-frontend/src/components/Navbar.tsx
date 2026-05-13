@@ -33,6 +33,9 @@ export default function Navbar() {
           {user ? (
             <>
               <li><Link to="/orders" onClick={() => setMenuOpen(false)}>Mijn Bestellingen</Link></li>
+              {user.role === 'Admin' && (
+                <li><Link to="/admin" onClick={() => setMenuOpen(false)}>Admin</Link></li>
+              )}
               <li>
                 <button className="navbar-link-btn" onClick={() => { handleLogout(); setMenuOpen(false); }}>
                   Uitloggen

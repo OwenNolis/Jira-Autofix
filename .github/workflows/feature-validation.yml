@@ -120,21 +120,31 @@ jobs:
           done <<< "$CHANGED_FILES"
 
           if [ "$MODE" = "full" ]; then
-            # Detect project root from changed files so we scan the right app, not the whole repo
+            # Scan all known source directories for this feature's project
+            # Detect frontend/backend roots from changed files, then add known sibling dirs
             PROJECT_DIR="$(echo "$CHANGED_FILES" | grep '/' | sed 's|/.*||' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')"
-            SCAN_ROOT="${PROJECT_DIR:-.}"
-            echo "Full scan root: $SCAN_ROOT"
+            FEATURE_PREFIX="$(echo "$PROJECT_DIR" | sed 's|-frontend||;s|-backend||')"
 
-            find "$SCAN_ROOT" -path '*/node_modules' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
-              printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
-              head -150 "$f"                            >> /tmp/code_context.txt
-              printf '\n```\n'                          >> /tmp/code_context.txt
-            done || true
-            find "$SCAN_ROOT" -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
-              printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
-              head -150 "$f"                                  >> /tmp/code_context.txt
-              printf '\n```\n'                                >> /tmp/code_context.txt
-            done || true
+            # Build list of directories to scan (frontend + backend if they exist)
+            SCAN_DIRS=""
+            for dir in "${FEATURE_PREFIX}-frontend" "${FEATURE_PREFIX}-backend" "$PROJECT_DIR"; do
+              [ -d "$dir" ] && SCAN_DIRS="$SCAN_DIRS $dir"
+            done
+            SCAN_DIRS="${SCAN_DIRS:-${PROJECT_DIR:-.}}"
+            echo "Full scan dirs:$SCAN_DIRS"
+
+            for SCAN_ROOT in $SCAN_DIRS; do
+              find "$SCAN_ROOT" -path '*/node_modules' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
+                printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
+                head -150 "$f"                            >> /tmp/code_context.txt
+                printf '\n```\n'                          >> /tmp/code_context.txt
+              done || true
+              find "$SCAN_ROOT" -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
+                printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
+                head -150 "$f"                                  >> /tmp/code_context.txt
+                printf '\n```\n'                                >> /tmp/code_context.txt
+              done || true
+            done
           fi
 
           echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
