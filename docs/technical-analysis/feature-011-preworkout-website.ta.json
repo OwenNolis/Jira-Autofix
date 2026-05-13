@@ -1,0 +1,2160 @@
+{
+  "meta": {
+    "featureId": "feature-011-preworkout-website",
+    "title": "Technische Analyse - Pre-workout Webshop",
+    "version": "1.0.0"
+  },
+  "scope": {
+    "inScope": [
+      "Full stack webshop voor pre-workout supplementen",
+      "Figma-level UI designs",
+      "UML diagrams",
+      "database ERD",
+      "API contracten",
+      "Productcatalogus module",
+      "Productdetail module",
+      "Winkelmand module",
+      "Checkout module",
+      "Betaling module",
+      "Account module",
+      "Admin dashboard module",
+      "Orderbeheer module",
+      "API-laag"
+    ],
+    "outOfScope": [
+      "Specifieke implementatiedetails van de betalingsprovider",
+      "Gedetailleerde marketingstrategie\u00ebn",
+      "Fysieke distributie van producten"
+    ]
+  },
+  "assumptions": [
+    "Wat is de exacte definitie van 'normale belasting' voor de laadtijd van het productoverzicht?",
+    "Welke specifieke betaalmethoden naast Bancontact en Creditcard worden ondersteund?",
+    "Hoe wordt omgegaan met het annuleren van een bestelling na het plaatsen ervan maar voor betaling?",
+    "Zijn er specifieke vereisten voor de beveiliging van de API-laag buiten de genoemde authenticatie en autorisatie?",
+    "Wat zijn de criteria voor het bepalen van de 'voorraadstatus' die getoond wordt op de productkaart?"
+  ],
+  "openQuestions": [
+    "Wat is de exacte definitie van 'normale belasting' voor de laadtijd van het productoverzicht?",
+    "Welke specifieke betaalmethoden naast Bancontact en Creditcard worden ondersteund?",
+    "Hoe wordt omgegaan met het annuleren van een bestelling na het plaatsen ervan maar voor betaling?",
+    "Zijn er specifieke vereisten voor de beveiliging van de API-laag buiten de genoemde authenticatie en autorisatie?",
+    "Wat zijn de criteria voor het bepalen van de 'voorraadstatus' die getoond wordt op de productkaart?"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "text": "Klanten moeten pre-workout producten kunnen zoeken, filteren, bekijken, toevoegen aan hun winkelmand, afrekenen en hun bestelgeschiedenis opvolgen.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-002",
+      "text": "Admins moeten producten, voorraad en bestellingen kunnen beheren.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-003",
+      "text": "De applicatie moet een duidelijke productcard stijl gebruiken met sterke CTA-knoppen.",
+      "priority": "should"
+    },
+    {
+      "id": "REQ-004",
+      "text": "De checkout moet een overzicht van de bestelling en een order summary bevatten.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-005",
+      "text": "De homepage moet een hero sectie bevatten met een titel, ondertitel, call-to-action knoppen en een afbeelding.",
+      "priority": "should"
+    },
+    {
+      "id": "REQ-006",
+      "text": "De productdetailpagina moet productinformatie tonen zoals afbeelding, titel, beschrijving, opties (cafe\u00efne, servings, smaak, voorraad), prijs en actieknoppen (toevoegen, favoriet).",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-007",
+      "text": "De checkout sectie moet invoervelden bevatten voor verzendgegevens (voornaam, achternaam, straat + nr, postcode, gemeente, e-mail) en opties voor betaalmethoden (Bancontact, Creditcard).",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-008",
+      "text": "De order summary sectie moet een overzicht tonen van bestelde items (naam, aantal, prijs) en de totale prijs.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-009",
+      "text": "De applicatie moet een responsive design hebben dat werkt op desktop, tablet en mobiel.",
+      "priority": "must"
+    },
+    {
+      "id": "REQ-010",
+      "text": "Het productoverzicht moet binnen 2 seconden laden bij normale belasting.",
+      "priority": "should"
+    },
+    {
+      "id": "REQ-011",
+      "text": "Wachtwoorden moeten gehasht worden opgeslagen.",
+      "priority": "must"
+    }
+  ],
+  "domain": {
+    "entities": [
+      {
+        "name": "User",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "firstName",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:1",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing"
+            ]
+          },
+          {
+            "name": "lastName",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:1",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing"
+            ]
+          },
+          {
+            "name": "email",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value",
+              "duplicate_per_day"
+            ]
+          },
+          {
+            "name": "passwordHash",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:60",
+              "maxLength:60"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "too_long",
+              "missing"
+            ]
+          },
+          {
+            "name": "role",
+            "type": "Role",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "CartItem",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "userId",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "productId",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "constraints": [
+              "notNull",
+              "minLength:1"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Product",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "name",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:1",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing"
+            ]
+          },
+          {
+            "name": "description",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:1"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing"
+            ]
+          },
+          {
+            "name": "price",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull",
+              "minLength:0"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "flavor",
+            "type": "String",
+            "constraints": [
+              "maxLength:255"
+            ],
+            "testCases": [
+              "too_long",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "caffeineMg",
+            "type": "Integer",
+            "constraints": [
+              "minLength:0"
+            ],
+            "testCases": [
+              "too_short",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "servings",
+            "type": "Integer",
+            "constraints": [
+              "minLength:1"
+            ],
+            "testCases": [
+              "too_short",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "stock",
+            "type": "Integer",
+            "constraints": [
+              "notNull",
+              "minLength:0"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "imageUrl",
+            "type": "String",
+            "constraints": [
+              "maxLength:255"
+            ],
+            "testCases": [
+              "too_long",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "isActive",
+            "type": "Boolean",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Order",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "userId",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "totalPrice",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull",
+              "minLength:0"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "OrderStatus",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "shippingAddress",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "minLength:1"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "OrderItem",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "orderId",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "productId",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "constraints": [
+              "notNull",
+              "minLength:1"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "unitPrice",
+            "type": "BigDecimal",
+            "constraints": [
+              "notNull",
+              "minLength:0"
+            ],
+            "testCases": [
+              "empty",
+              "too_short",
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Payment",
+        "fields": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "orderId",
+            "type": "UUID",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "provider",
+            "type": "PaymentProvider",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "PaymentStatus",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "transactionReference",
+            "type": "String",
+            "constraints": [
+              "notNull",
+              "maxLength:255"
+            ],
+            "testCases": [
+              "empty",
+              "too_long",
+              "missing",
+              "invalid_value",
+              "duplicate_per_day"
+            ]
+          },
+          {
+            "name": "paidAt",
+            "type": "LocalDateTime",
+            "constraints": [],
+            "testCases": [
+              "invalid_value"
+            ]
+          },
+          {
+            "name": "createdAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          },
+          {
+            "name": "updatedAt",
+            "type": "LocalDateTime",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Role",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "OrderStatus",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "PaymentProvider",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "PaymentStatus",
+        "fields": [
+          {
+            "name": "value",
+            "type": "enum_value",
+            "constraints": [
+              "notNull"
+            ],
+            "testCases": [
+              "missing",
+              "invalid_value"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "api": {
+    "errorFormat": {
+      "type": "ApiError",
+      "fields": [
+        "correlationId",
+        "code",
+        "message",
+        "fieldErrors"
+      ]
+    },
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/api/products",
+        "summary": "Haal een lijst met producten op, met filter- en sorteeropties.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "ProductListResponse",
+            "notes": "Een gepagineerde lijst van actieve producten met basisinformatie."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het ophalen van producten."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "GET",
+        "path": "/api/products/{id}",
+        "summary": "Haal de details van een specifiek product op.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "ProductDetailResponse",
+            "notes": "Gedetailleerde informatie van het product."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Product niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het ophalen van productdetails."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/register",
+        "summary": "Registreer een nieuwe gebruiker.",
+        "request": {
+          "bodySchemaRef": "RegisterUserRequest",
+          "validationRules": [
+            "firstName: Moet niet leeg zijn en maximaal 255 karakters.",
+            "lastName: Moet niet leeg zijn en maximaal 255 karakters.",
+            "email: Moet niet leeg zijn, maximaal 255 karakters en een geldig e-mailformaat hebben.",
+            "password: Moet niet leeg zijn, minimaal 60 karakters en maximaal 60 karakters (voor bcrypt hash)."
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "UserResponse",
+            "notes": "Gebruiker succesvol geregistreerd en ingelogd, inclusief token."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body, bijvoorbeeld een ongeldig e-mailformaat of te korte wachtwoord."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "E-mailadres is al in gebruik."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout tijdens registratie."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "summary": "Log een gebruiker in.",
+        "request": {
+          "bodySchemaRef": "LoginUserRequest",
+          "validationRules": [
+            "email: Moet niet leeg zijn en maximaal 255 karakters.",
+            "password: Moet niet leeg zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "LoginResponse",
+            "notes": "Gebruiker succesvol ingelogd, inclusief access token en gebruikersinformatie."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige e-mail of wachtwoord."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout tijdens het inloggen."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "GET",
+        "path": "/api/cart",
+        "summary": "Haal de inhoud van de winkelmand op voor de ingelogde gebruiker.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "CartResponse",
+            "notes": "De winkelmand met items en totale prijzen."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het ophalen van de winkelmand."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/cart/items",
+        "summary": "Voeg een product toe aan de winkelmand.",
+        "request": {
+          "bodySchemaRef": "AddCartItemRequest",
+          "validationRules": [
+            "productId: Moet een geldige UUID zijn.",
+            "quantity: Moet een positief geheel getal zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "CartItemResponse",
+            "notes": "Het toegevoegde winkelmanditem."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige input, bijvoorbeeld een niet-positieve quantity."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Product niet gevonden."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onvoldoende voorraad voor het gevraagde aantal."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het toevoegen van een item aan de winkelmand."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/cart/items/{id}",
+        "summary": "Update de hoeveelheid van een item in de winkelmand.",
+        "request": {
+          "bodySchemaRef": "UpdateCartItemRequest",
+          "validationRules": [
+            "quantity: Moet een positief geheel getal zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "CartItemResponse",
+            "notes": "Het bijgewerkte winkelmanditem."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige input, bijvoorbeeld een niet-positieve quantity."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Winkelmanditem niet gevonden."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onvoldoende voorraad voor het gevraagde aantal."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het bijwerken van een winkelmanditem."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/cart/items/{id}",
+        "summary": "Verwijder een item uit de winkelmand.",
+        "request": {},
+        "responses": [
+          {
+            "status": 204,
+            "notes": "Winkelmanditem succesvol verwijderd.",
+            "bodySchemaRef": "EmptyResponse"
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Winkelmanditem niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het verwijderen van een winkelmanditem."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/orders",
+        "summary": "Plaats een nieuwe bestelling vanuit de winkelmand.",
+        "request": {
+          "bodySchemaRef": "CreateOrderRequest",
+          "validationRules": [
+            "shippingAddress: Moet niet leeg zijn en minimaal 1 karakter.",
+            "paymentMethod: Moet een geldige PaymentProvider enum waarde zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "OrderResponse",
+            "notes": "Bestelling succesvol geplaatst, inclusief een betalings-URL indien van toepassing."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "De winkelmand is leeg of er is een andere geldige inputfout."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 409,
+            "bodySchemaRef": "ApiError",
+            "notes": "Voorraadprobleem met een of meer items in de winkelmand."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het plaatsen van de bestelling."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "GET",
+        "path": "/api/orders/me",
+        "summary": "Haal de bestelgeschiedenis op voor de ingelogde gebruiker.",
+        "request": {},
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "OrderListResponse",
+            "notes": "Een lijst met bestellingen van de gebruiker."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het ophalen van de bestelgeschiedenis."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "POST",
+        "path": "/api/payments/webhook",
+        "summary": "Verwerk een webhook callback van een betalingsprovider.",
+        "request": {
+          "bodySchemaRef": "PaymentWebhookRequest",
+          "validationRules": [
+            "transactionReference: Moet niet leeg zijn en maximaal 255 karakters.",
+            "status: Moet een geldige PaymentStatus enum waarde zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "notes": "Webhook succesvol verwerkt en orderstatus bijgewerkt.",
+            "bodySchemaRef": "EmptyResponse"
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige payload van de webhook."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het verwerken van de webhook."
+          }
+        ],
+        "auth": "none"
+      },
+      {
+        "method": "POST",
+        "path": "/api/admin/products",
+        "summary": "Voeg een nieuw product toe aan de catalogus (alleen voor admins).",
+        "request": {
+          "bodySchemaRef": "CreateProductRequest",
+          "validationRules": [
+            "name: Moet niet leeg zijn, minimaal 1 en maximaal 255 karakters.",
+            "description: Moet niet leeg zijn en minimaal 1 karakter.",
+            "price: Moet niet leeg zijn en minimaal 0.",
+            "stock: Moet niet leeg zijn en minimaal 0.",
+            "imageUrl: Maximaal 255 karakters.",
+            "flavor: Maximaal 255 karakters.",
+            "caffeineMg: Minimaal 0.",
+            "servings: Minimaal 1.",
+            "isActive: Moet een boolean zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 201,
+            "bodySchemaRef": "ProductResponse",
+            "notes": "Nieuw product succesvol aangemaakt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd of geen admin rechten."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het aanmaken van een product."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/admin/products/{id}",
+        "summary": "Update een bestaand product volledig (alleen voor admins).",
+        "request": {
+          "bodySchemaRef": "UpdateProductRequest",
+          "validationRules": [
+            "name: Moet niet leeg zijn, minimaal 1 en maximaal 255 karakters.",
+            "description: Moet niet leeg zijn en minimaal 1 karakter.",
+            "price: Moet niet leeg zijn en minimaal 0.",
+            "stock: Moet niet leeg zijn en minimaal 0.",
+            "imageUrl: Maximaal 255 karakters.",
+            "flavor: Maximaal 255 karakters.",
+            "caffeineMg: Minimaal 0.",
+            "servings: Minimaal 1.",
+            "isActive: Moet een boolean zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "ProductResponse",
+            "notes": "Product succesvol bijgewerkt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Validatiefout in de request body."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd of geen admin rechten."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Product niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het bijwerken van een product."
+          }
+        ],
+        "auth": "bearer"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/admin/orders/{id}/status",
+        "summary": "Update de status van een bestelling (alleen voor admins).",
+        "request": {
+          "bodySchemaRef": "UpdateOrderStatusRequest",
+          "validationRules": [
+            "status: Moet een geldige OrderStatus enum waarde zijn."
+          ]
+        },
+        "responses": [
+          {
+            "status": 200,
+            "bodySchemaRef": "OrderResponse",
+            "notes": "Bestelstatus succesvol bijgewerkt."
+          },
+          {
+            "status": 400,
+            "bodySchemaRef": "ApiError",
+            "notes": "Ongeldige statusovergang of ongeldige statuswaarde."
+          },
+          {
+            "status": 401,
+            "bodySchemaRef": "ApiError",
+            "notes": "Niet geauthenticeerd of geen admin rechten."
+          },
+          {
+            "status": 404,
+            "bodySchemaRef": "ApiError",
+            "notes": "Bestelling niet gevonden."
+          },
+          {
+            "status": 500,
+            "bodySchemaRef": "ApiError",
+            "notes": "Onverwachte serverfout bij het bijwerken van de bestelstatus."
+          }
+        ],
+        "auth": "bearer"
+      }
+    ]
+  },
+  "backend": {
+    "modules": [
+      {
+        "name": "product",
+        "classes": [
+          {
+            "name": "ProductController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor productgerelateerde operaties."
+          },
+          {
+            "name": "ProductService",
+            "responsibility": "Bevat de bedrijfslogica voor het beheren van producten, inclusief zoeken, filteren en sorteren."
+          },
+          {
+            "name": "ProductRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de productgegevensopslag."
+          },
+          {
+            "name": "Product",
+            "responsibility": "Representeert een product in het domeinmodel."
+          },
+          {
+            "name": "ProductDTO",
+            "responsibility": "Data Transfer Object voor productinformatie in API-responses."
+          },
+          {
+            "name": "ProductDetailDTO",
+            "responsibility": "Data Transfer Object voor gedetailleerde productinformatie."
+          },
+          {
+            "name": "ProductListResponseDTO",
+            "responsibility": "Data Transfer Object voor de gepagineerde lijst van producten."
+          },
+          {
+            "name": "CreateProductRequestDTO",
+            "responsibility": "Data Transfer Object voor het aanmaken van een nieuw product."
+          },
+          {
+            "name": "UpdateProductRequestDTO",
+            "responsibility": "Data Transfer Object voor het bijwerken van een bestaand product."
+          },
+          {
+            "name": "ProductNotFoundException",
+            "responsibility": "Exception die wordt gegooid wanneer een product niet wordt gevonden."
+          },
+          {
+            "name": "ProductSearchValidator",
+            "responsibility": "Valideert de zoek- en filterparameters voor producten."
+          }
+        ]
+      },
+      {
+        "name": "user",
+        "classes": [
+          {
+            "name": "AuthController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor gebruikersauthenticatie en -registratie."
+          },
+          {
+            "name": "AuthService",
+            "responsibility": "Bevat de bedrijfslogica voor gebruikersregistratie en -authenticatie."
+          },
+          {
+            "name": "UserRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de gebruikersgegevensopslag."
+          },
+          {
+            "name": "User",
+            "responsibility": "Representeert een gebruiker in het domeinmodel."
+          },
+          {
+            "name": "UserResponseDTO",
+            "responsibility": "Data Transfer Object voor gebruikersinformatie in API-responses."
+          },
+          {
+            "name": "RegisterUserRequestDTO",
+            "responsibility": "Data Transfer Object voor het registreren van een nieuwe gebruiker."
+          },
+          {
+            "name": "LoginUserRequestDTO",
+            "responsibility": "Data Transfer Object voor het inloggen van een gebruiker."
+          },
+          {
+            "name": "LoginResponseDTO",
+            "responsibility": "Data Transfer Object voor de login response, inclusief token."
+          },
+          {
+            "name": "EmailAlreadyExistsException",
+            "responsibility": "Exception die wordt gegooid wanneer een e-mailadres al in gebruik is."
+          },
+          {
+            "name": "InvalidCredentialsException",
+            "responsibility": "Exception die wordt gegooid bij ongeldige inloggegevens."
+          },
+          {
+            "name": "UserRegistrationValidator",
+            "responsibility": "Valideert de input voor gebruikersregistratie."
+          },
+          {
+            "name": "UserLoginValidator",
+            "responsibility": "Valideert de input voor gebruikerslogin."
+          }
+        ]
+      },
+      {
+        "name": "cart",
+        "classes": [
+          {
+            "name": "CartController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor winkelmandoperaties."
+          },
+          {
+            "name": "CartService",
+            "responsibility": "Bevat de bedrijfslogica voor het beheren van de winkelmand van een gebruiker."
+          },
+          {
+            "name": "CartItemRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de winkelmanditemgegevensopslag."
+          },
+          {
+            "name": "CartItem",
+            "responsibility": "Representeert een item in de winkelmand."
+          },
+          {
+            "name": "CartResponseDTO",
+            "responsibility": "Data Transfer Object voor de winkelmandinhoud."
+          },
+          {
+            "name": "CartItemResponseDTO",
+            "responsibility": "Data Transfer Object voor een individueel winkelmanditem."
+          },
+          {
+            "name": "AddCartItemRequestDTO",
+            "responsibility": "Data Transfer Object voor het toevoegen van een item aan de winkelmand."
+          },
+          {
+            "name": "UpdateCartItemRequestDTO",
+            "responsibility": "Data Transfer Object voor het bijwerken van de hoeveelheid van een winkelmanditem."
+          },
+          {
+            "name": "InsufficientStockException",
+            "responsibility": "Exception die wordt gegooid wanneer er onvoldoende voorraad is."
+          },
+          {
+            "name": "CartItemNotFoundException",
+            "responsibility": "Exception die wordt gegooid wanneer een winkelmanditem niet wordt gevonden."
+          },
+          {
+            "name": "CartItemValidator",
+            "responsibility": "Valideert de input voor winkelmanditems."
+          }
+        ]
+      },
+      {
+        "name": "order",
+        "classes": [
+          {
+            "name": "OrderController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor besteloperaties."
+          },
+          {
+            "name": "OrderService",
+            "responsibility": "Bevat de bedrijfslogica voor het plaatsen en beheren van bestellingen."
+          },
+          {
+            "name": "OrderRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de bestelgegevensopslag."
+          },
+          {
+            "name": "OrderItemRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de bestelitemgegevensopslag."
+          },
+          {
+            "name": "Order",
+            "responsibility": "Representeert een bestelling in het domeinmodel."
+          },
+          {
+            "name": "OrderItem",
+            "responsibility": "Representeert een item binnen een bestelling."
+          },
+          {
+            "name": "OrderResponseDTO",
+            "responsibility": "Data Transfer Object voor een bestelling."
+          },
+          {
+            "name": "OrderListResponseDTO",
+            "responsibility": "Data Transfer Object voor een lijst van bestellingen."
+          },
+          {
+            "name": "CreateOrderRequestDTO",
+            "responsibility": "Data Transfer Object voor het aanmaken van een nieuwe bestelling."
+          },
+          {
+            "name": "UpdateOrderStatusRequestDTO",
+            "responsibility": "Data Transfer Object voor het bijwerken van de status van een bestelling."
+          },
+          {
+            "name": "EmptyCartException",
+            "responsibility": "Exception die wordt gegooid wanneer een bestelling wordt geplaatst met een lege winkelmand."
+          },
+          {
+            "name": "OrderNotFoundException",
+            "responsibility": "Exception die wordt gegooid wanneer een bestelling niet wordt gevonden."
+          },
+          {
+            "name": "OrderCreationValidator",
+            "responsibility": "Valideert de input voor het aanmaken van een bestelling."
+          },
+          {
+            "name": "OrderStatusUpdateValidator",
+            "responsibility": "Valideert de input voor het bijwerken van de bestelstatus."
+          }
+        ]
+      },
+      {
+        "name": "payment",
+        "classes": [
+          {
+            "name": "PaymentController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor betalingsgerelateerde operaties, inclusief webhooks."
+          },
+          {
+            "name": "PaymentService",
+            "responsibility": "Bevat de bedrijfslogica voor het verwerken van betalingen en het afhandelen van webhook callbacks."
+          },
+          {
+            "name": "PaymentRepository",
+            "responsibility": "Verantwoordelijk voor de interactie met de betalingsgegevensopslag."
+          },
+          {
+            "name": "Payment",
+            "responsibility": "Representeert een betaling in het domeinmodel."
+          },
+          {
+            "name": "PaymentWebhookRequestDTO",
+            "responsibility": "Data Transfer Object voor de payload van een betalingswebhook."
+          },
+          {
+            "name": "PaymentWebhookValidator",
+            "responsibility": "Valideert de input van een betalingswebhook."
+          }
+        ]
+      },
+      {
+        "name": "admin",
+        "classes": [
+          {
+            "name": "AdminProductController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor productbeheer door admins."
+          },
+          {
+            "name": "AdminOrderController",
+            "responsibility": "Behandelt inkomende HTTP-verzoeken voor bestelbeheer door admins."
+          },
+          {
+            "name": "AdminProductService",
+            "responsibility": "Bevat de bedrijfslogica voor productbeheer door admins."
+          },
+          {
+            "name": "AdminOrderService",
+            "responsibility": "Bevat de bedrijfslogica voor bestelbeheer door admins."
+          },
+          {
+            "name": "AdminProductValidator",
+            "responsibility": "Valideert de input voor productcreatie en -updates door admins."
+          },
+          {
+            "name": "AdminOrderStatusUpdateValidator",
+            "responsibility": "Valideert de input voor het bijwerken van bestelstatussen door admins."
+          }
+        ]
+      },
+      {
+        "name": "common",
+        "classes": [
+          {
+            "name": "ApiError",
+            "responsibility": "Standaardformaat voor foutmeldingen in API-responses."
+          },
+          {
+            "name": "ApiErrorDTO",
+            "responsibility": "Data Transfer Object voor de ApiError structuur."
+          },
+          {
+            "name": "Role",
+            "responsibility": "Enum die de rollen van gebruikers vertegenwoordigt (bv. USER, ADMIN)."
+          },
+          {
+            "name": "OrderStatus",
+            "responsibility": "Enum die de statussen van bestellingen vertegenwoordigt."
+          },
+          {
+            "name": "PaymentProvider",
+            "responsibility": "Enum die de beschikbare betaalproviders vertegenwoordigt."
+          },
+          {
+            "name": "PaymentStatus",
+            "responsibility": "Enum die de statussen van betalingen vertegenwoordigt."
+          },
+          {
+            "name": "GlobalExceptionHandler",
+            "responsibility": "Centrale handler voor het afhandelen van exceptions en het genereren van ApiError responses."
+          },
+          {
+            "name": "SecurityConfig",
+            "responsibility": "Configureert beveiligingsinstellingen, inclusief authenticatie en autorisatie."
+          },
+          {
+            "name": "JwtTokenProvider",
+            "responsibility": "Verantwoordelijk voor het genereren en valideren van JWT-tokens."
+          },
+          {
+            "name": "PasswordHasher",
+            "responsibility": "Verantwoordelijk voor het hashen en verifi\u00ebren van wachtwoorden."
+          }
+        ]
+      }
+    ]
+  },
+  "frontend": {
+    "routes": [
+      "/",
+      "/products",
+      "/products/:id",
+      "/cart",
+      "/checkout",
+      "/order-history",
+      "/login",
+      "/register",
+      "/admin",
+      "/admin/products",
+      "/admin/products/new",
+      "/admin/products/:id",
+      "/admin/orders",
+      "/admin/orders/:id",
+      "*"
+    ],
+    "components": [
+      "HomePage",
+      "HeroSection",
+      "ProductCardList",
+      "ProductCard",
+      "ProductListPage",
+      "ProductFilterSidebar",
+      "ProductSortDropdown",
+      "Pagination",
+      "ProductDetailPage",
+      "ProductImageGallery",
+      "ProductDetails",
+      "AddToCartButton",
+      "FavoriteButton",
+      "CartPage",
+      "CartItemList",
+      "CartItem",
+      "OrderSummary",
+      "CheckoutButton",
+      "CheckoutPage",
+      "ShippingForm",
+      "PaymentMethodSelector",
+      "PlaceOrderButton",
+      "OrderHistoryPage",
+      "OrderList",
+      "OrderItem",
+      "LoginPage",
+      "LoginForm",
+      "RegisterLink",
+      "RegisterPage",
+      "RegisterForm",
+      "AdminDashboardPage",
+      "AdminNavigation",
+      "AdminProductListPage",
+      "AdminProductTable",
+      "AddProductButton",
+      "AdminCreateProductPage",
+      "ProductForm",
+      "AdminEditProductPage",
+      "AdminOrderListPage",
+      "AdminOrderTable",
+      "AdminOrderDetailPage",
+      "OrderStatusUpdater",
+      "NotFoundPage"
+    ]
+  },
+  "tests": {
+    "unit": [
+      "HomePage render",
+      "ProductCard render",
+      "ProductFilterSidebar render",
+      "ProductSortDropdown render",
+      "Pagination render",
+      "ProductDetailPage render",
+      "ProductImageGallery render",
+      "ProductDetails render",
+      "AddToCartButton render",
+      "CartPage render",
+      "CartItemList render",
+      "CartItem render",
+      "OrderSummary render",
+      "CheckoutPage render",
+      "ShippingForm render",
+      "PaymentMethodSelector render",
+      "OrderHistoryPage render",
+      "OrderList render",
+      "OrderItem render",
+      "LoginPage render",
+      "LoginForm render",
+      "RegisterPage render",
+      "RegisterForm render",
+      "AdminDashboardPage render",
+      "AdminNavigation render",
+      "AdminProductListPage render",
+      "AdminProductTable render",
+      "AdminCreateProductPage render",
+      "ProductForm render",
+      "AdminEditProductPage render",
+      "AdminOrderListPage render",
+      "AdminOrderTable render",
+      "AdminOrderDetailPage render",
+      "OrderStatusUpdater render",
+      "NotFoundPage render",
+      "ApiErrorDisplay render",
+      "LoadingSpinner render"
+    ],
+    "integration": [
+      "GET /api/products \u2192 200 OK",
+      "GET /api/products/{id} \u2192 200 OK",
+      "POST /api/auth/register \u2192 201 Created",
+      "POST /api/auth/login \u2192 200 OK",
+      "GET /api/cart \u2192 200 OK",
+      "POST /api/cart/items \u2192 201 Created",
+      "PATCH /api/cart/items/{id} \u2192 200 OK",
+      "DELETE /api/cart/items/{id} \u2192 204 No Content",
+      "POST /api/orders \u2192 201 Created",
+      "GET /api/orders/me \u2192 200 OK",
+      "POST /api/admin/products \u2192 201 Created",
+      "PUT /api/admin/products/{id} \u2192 200 OK",
+      "PATCH /api/admin/orders/{id}/status \u2192 200 OK"
+    ],
+    "e2e": [
+      "Gebruiker navigeert naar de homepage, bekijkt producten, voegt een product toe aan de winkelmand, gaat naar de checkout, vult verzendgegevens in, plaatst de bestelling en bekijkt de bestelgeschiedenis.",
+      "Gebruiker registreert een nieuw account, logt in, voegt een product toe aan de winkelmand en gaat naar de checkout.",
+      "Admin logt in, navigeert naar de productbeheerpagina, voegt een nieuw product toe, bewerkt een bestaand product en verwijdert het product.",
+      "Admin logt in, navigeert naar de bestelbeheerpagina, bekijkt de details van een bestelling en werkt de status van de bestelling bij."
+    ]
+  },
+  "acceptanceCriteria": [
+    {
+      "acId": "AC-001-1",
+      "reqId": "REQ-001",
+      "given": "Een gebruiker is ingelogd en er zijn pre-workout producten beschikbaar in de database.",
+      "when": "De gebruiker navigeert naar de productlijstpagina en voert 'Whey Protein' in het zoekveld in.",
+      "then": "De API retourneert een HTTP 200 met een lijst van producten waarvan de naam 'Whey Protein' bevat, en de productcard stijl is toegepast.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-001-2",
+      "reqId": "REQ-001",
+      "given": "Een gebruiker is ingelogd en er zijn pre-workout producten beschikbaar met verschillende 'caffeineMg' waarden.",
+      "when": "De gebruiker filtert de productlijst op 'caffeineMg' tussen 100 en 200.",
+      "then": "De API retourneert een HTTP 200 met een lijst van producten waarbij 'caffeineMg' tussen 100 en 200 ligt.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-001-3",
+      "reqId": "REQ-001",
+      "given": "Een gebruiker is ingelogd en er is een product met ID 'prod-123' beschikbaar.",
+      "when": "De gebruiker voegt 2 stuks van product 'prod-123' toe aan de winkelmand.",
+      "then": "De API retourneert een HTTP 201 met een CartItemResponse die de toegevoegde items met de correcte hoeveelheid en product-ID bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-001-4",
+      "reqId": "REQ-001",
+      "given": "Een gebruiker is ingelogd en heeft producten in de winkelmand.",
+      "when": "De gebruiker navigeert naar de checkoutpagina en voltooit de bestelling met geldige verzendgegevens en betaalmethode.",
+      "then": "De API retourneert een HTTP 201 met een OrderResponse die de gecre\u00eberde bestelling bevat, en de winkelmand is leeggemaakt.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-001-5",
+      "reqId": "REQ-001",
+      "given": "Een gebruiker is ingelogd en heeft eerder bestellingen geplaatst.",
+      "when": "De gebruiker navigeert naar de bestelgeschiedenispagina.",
+      "then": "De API retourneert een HTTP 200 met een OrderListResponse die een lijst van de geplaatste bestellingen van de gebruiker bevat.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-001-6",
+      "reqId": "REQ-001",
+      "given": "Een gebruiker is niet ingelogd.",
+      "when": "De gebruiker probeert een product toe te voegen aan de winkelmand.",
+      "then": "De API retourneert een HTTP 401 met een ApiError die aangeeft dat authenticatie vereist is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-1",
+      "reqId": "REQ-002",
+      "given": "Een gebruiker met de rol 'ADMIN' is ingelogd.",
+      "when": "De admin voegt een nieuw product toe via POST /api/admin/products met de volgende gegevens: name='Test Product', description='Een test product', price=19.99, stock=50.",
+      "then": "De API retourneert een HTTP 201 met een ProductResponse die het nieuw aangemaakte product bevat, inclusief de verstrekte details.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-2",
+      "reqId": "REQ-002",
+      "given": "Een gebruiker met de rol 'ADMIN' is ingelogd en er is een product met ID 'prod-456' in de database.",
+      "when": "De admin update de voorraad van product 'prod-456' naar 75 via PATCH /api/admin/products/prod-456 met body {stock: 75}.",
+      "then": "De API retourneert een HTTP 200 met een ProductResponse die het bijgewerkte product bevat, met een voorraad van 75.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-3",
+      "reqId": "REQ-002",
+      "given": "Een gebruiker met de rol 'ADMIN' is ingelogd en er is een bestelling met ID 'order-789' met status 'PENDING'.",
+      "when": "De admin wijzigt de status van bestelling 'order-789' naar 'SHIPPED' via PATCH /api/admin/orders/order-789/status met body {status: 'SHIPPED'}.",
+      "then": "De API retourneert een HTTP 200 met een OrderResponse die de bijgewerkte bestelling bevat, met status 'SHIPPED'.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-4",
+      "reqId": "REQ-002",
+      "given": "Een gebruiker met de rol 'USER' is ingelogd.",
+      "when": "De gebruiker probeert een nieuw product toe te voegen via POST /api/admin/products.",
+      "then": "De API retourneert een HTTP 403 met een ApiError die aangeeft dat de gebruiker niet geautoriseerd is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-002-5",
+      "reqId": "REQ-002",
+      "given": "Een gebruiker met de rol 'ADMIN' is ingelogd en er is een product met ID 'prod-999' dat niet bestaat.",
+      "when": "De admin probeert de voorraad van product 'prod-999' te updaten via PATCH /api/admin/products/prod-999 met body {stock: 10}.",
+      "then": "De API retourneert een HTTP 404 met een ApiError die aangeeft dat het product niet gevonden is.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-003-1",
+      "reqId": "REQ-003",
+      "given": "Er worden producten weergegeven op de productlijstpagina.",
+      "when": "De pagina wordt geladen.",
+      "then": "Elk product wordt weergegeven in een productcard met een duidelijke afbeelding, titel, prijs en een 'Toevoegen aan winkelmand' knop met een prominente stijl (bv. contrasterende kleur, duidelijke tekst).",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-003-2",
+      "reqId": "REQ-003",
+      "given": "Een productcard wordt weergegeven.",
+      "when": "De gebruiker hovert over de 'Toevoegen aan winkelmand' knop.",
+      "then": "De knop toont een visuele feedback (bv. kleurverandering, lichte animatie) om aan te geven dat deze interactief is.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-004-1",
+      "reqId": "REQ-004",
+      "given": "Een gebruiker is ingelogd en heeft producten in de winkelmand.",
+      "when": "De gebruiker navigeert naar de checkoutpagina.",
+      "then": "De checkoutpagina toont een sectie met een overzicht van de bestelling, inclusief de namen, aantallen en prijzen van de producten in de winkelmand.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-004-2",
+      "reqId": "REQ-004",
+      "given": "Een gebruiker is ingelogd en heeft producten in de winkelmand.",
+      "when": "De gebruiker navigeert naar de checkoutpagina.",
+      "then": "De checkoutpagina toont een 'Order Summary' sectie met de totale prijs van de bestelling, inclusief eventuele verzendkosten en belastingen.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-004-3",
+      "reqId": "REQ-004",
+      "given": "Een gebruiker is ingelogd en heeft producten in de winkelmand.",
+      "when": "De gebruiker probeert de checkout te voltooien zonder verzendgegevens in te vullen.",
+      "then": "De applicatie toont een foutmelding die aangeeft dat de verzendgegevens verplicht zijn, en de bestelling wordt niet geplaatst.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-005-1",
+      "reqId": "REQ-005",
+      "given": "De applicatie wordt geopend.",
+      "when": "De homepage wordt geladen.",
+      "then": "De homepage bevat een hero sectie met een duidelijke titel (bv. 'Ontdek Onze Krachtige Pre-Workouts'), een ondertitel (bv. 'Maximaliseer je training'), minimaal \u00e9\u00e9n call-to-action knop (bv. 'Shop Nu') en een relevante achtergrondafbeelding.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-005-2",
+      "reqId": "REQ-005",
+      "given": "De homepage wordt weergegeven.",
+      "when": "De gebruiker klikt op de 'Shop Nu' call-to-action knop in de hero sectie.",
+      "then": "De gebruiker wordt doorgestuurd naar de productlijstpagina.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-006-1",
+      "reqId": "REQ-006",
+      "given": "Er is een product met ID 'prod-abc' in de database met de volgende details: name='Intense Energy', description='Boost je focus', flavor='Fruit Punch', caffeineMg=150, servings=30, stock=20, price=29.99, imageUrl='http://example.com/image.jpg'.",
+      "when": "De gebruiker navigeert naar de productdetailpagina voor product 'prod-abc'.",
+      "then": "De pagina toont de afbeelding 'http://example.com/image.jpg', de titel 'Intense Energy', de beschrijving 'Boost je focus', de opties 'Fruit Punch', '150mg cafe\u00efne', '30 servings', de prijs '\u20ac29.99', en een 'Toevoegen aan winkelmand' knop en een 'Favoriet' knop.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-006-2",
+      "reqId": "REQ-006",
+      "given": "Er is een product met ID 'prod-xyz' met een voorraad van 0 stuks.",
+      "when": "De gebruiker bekijkt de productdetailpagina voor product 'prod-xyz'.",
+      "then": "De 'Toevoegen aan winkelmand' knop is uitgeschakeld of toont een bericht 'Niet op voorraad'.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-006-3",
+      "reqId": "REQ-006",
+      "given": "Er is een product met ID 'prod-def' met een voorraad van 5 stuks.",
+      "when": "De gebruiker probeert 6 stuks van product 'prod-def' toe te voegen aan de winkelmand vanaf de productdetailpagina.",
+      "then": "De applicatie toont een foutmelding dat de gevraagde hoeveelheid de beschikbare voorraad overschrijdt, en de hoeveelheid wordt niet bijgewerkt in de winkelmand.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-007-1",
+      "reqId": "REQ-007",
+      "given": "Een gebruiker is ingelogd en navigeert naar de checkoutpagina.",
+      "when": "De gebruiker bekijkt de verzendgegevens sectie.",
+      "then": "De sectie bevat invoervelden voor: voornaam, achternaam, straat + nummer, postcode, gemeente en e-mailadres.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-007-2",
+      "reqId": "REQ-007",
+      "given": "Een gebruiker is ingelogd en navigeert naar de checkoutpagina.",
+      "when": "De gebruiker bekijkt de betaalmethoden sectie.",
+      "then": "De sectie toont opties voor 'Bancontact' en 'Creditcard'.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-007-3",
+      "reqId": "REQ-007",
+      "given": "Een gebruiker is ingelogd en navigeert naar de checkoutpagina.",
+      "when": "De gebruiker probeert de checkout te voltooien zonder het verplichte veld 'e-mailadres' in te vullen.",
+      "then": "De applicatie toont een foutmelding die aangeeft dat het e-mailadres verplicht is, en de bestelling wordt niet geplaatst.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-007-4",
+      "reqId": "REQ-007",
+      "given": "Een gebruiker is ingelogd en navigeert naar de checkoutpagina.",
+      "when": "De gebruiker probeert de checkout te voltooien met een ongeldig e-mailformaat (bv. 'test@.com').",
+      "then": "De applicatie toont een foutmelding die aangeeft dat het e-mailadres ongeldig is, en de bestelling wordt niet geplaatst.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-008-1",
+      "reqId": "REQ-008",
+      "given": "Een gebruiker is ingelogd en heeft producten in de winkelmand.",
+      "when": "De gebruiker navigeert naar de checkoutpagina.",
+      "then": "De 'Order Summary' sectie toont een lijst van bestelde items, waarbij elk item de naam, het aantal en de prijs per item vermeldt.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-008-2",
+      "reqId": "REQ-008",
+      "given": "Een gebruiker is ingelogd en heeft producten in de winkelmand.",
+      "when": "De gebruiker navigeert naar de checkoutpagina.",
+      "then": "De 'Order Summary' sectie toont de totale prijs van de bestelling, berekend als de som van de prijzen van alle bestelde items.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-008-3",
+      "reqId": "REQ-008",
+      "given": "Een gebruiker is ingelogd en heeft 2 stuks van product 'A' (prijs \u20ac10) en 1 stuk van product 'B' (prijs \u20ac20) in de winkelmand.",
+      "when": "De gebruiker navigeert naar de checkoutpagina.",
+      "then": "De 'Order Summary' sectie toont de totale prijs als \u20ac40 (2 * \u20ac10 + 1 * \u20ac20).",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-009-1",
+      "reqId": "REQ-009",
+      "given": "Een gebruiker opent de applicatie op een desktop browser.",
+      "when": "De homepage wordt geladen.",
+      "then": "De layout van de homepage is geoptimaliseerd voor een desktop schermresolutie, met elementen die goed gepositioneerd en leesbaar zijn.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-009-2",
+      "reqId": "REQ-009",
+      "given": "Een gebruiker opent de applicatie op een tablet browser.",
+      "when": "De productlijstpagina wordt geladen.",
+      "then": "De layout van de productlijstpagina past zich aan de tablet schermresolutie aan, met een aangepast aantal kolommen en leesbare elementen.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-009-3",
+      "reqId": "REQ-009",
+      "given": "Een gebruiker opent de applicatie op een mobiele browser.",
+      "when": "De productdetailpagina wordt geladen.",
+      "then": "De layout van de productdetailpagina is geoptimaliseerd voor een mobiel scherm, met elementen die verticaal gestapeld zijn en gemakkelijk te navigeren met \u00e9\u00e9n hand.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-009-4",
+      "reqId": "REQ-009",
+      "given": "Een gebruiker opent de applicatie op een mobiele browser.",
+      "when": "De gebruiker probeert te scrollen door een lange lijst van producten.",
+      "then": "Het scrollen is soepel en responsief, zonder haperingen of vertragingen.",
+      "testType": "e2e"
+    },
+    {
+      "acId": "AC-010-1",
+      "reqId": "REQ-010",
+      "given": "De applicatie is onder normale belasting (bv. 100 gelijktijdige gebruikers).",
+      "when": "Een gebruiker navigeert naar de productlijstpagina (GET /api/products).",
+      "then": "De productlijstpagina laadt volledig binnen 2 seconden.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-010-2",
+      "reqId": "REQ-010",
+      "given": "De applicatie is onder verhoogde belasting (bv. 500 gelijktijdige gebruikers).",
+      "when": "Een gebruiker navigeert naar de productlijstpagina (GET /api/products).",
+      "then": "De productlijstpagina laadt binnen een acceptabele tijd (bv. maximaal 5 seconden), hoewel de 2-seconden eis mogelijk niet gehaald wordt.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-011-1",
+      "reqId": "REQ-011",
+      "given": "Een nieuwe gebruiker registreert zich met het wachtwoord 'SecureP@ssw0rd1'.",
+      "when": "De registratie wordt verwerkt en de gebruikersgegevens worden opgeslagen in de database.",
+      "then": "Het wachtwoordveld in de database voor deze gebruiker bevat een gehasht representatie van 'SecureP@ssw0rd1' (bv. met bcrypt), en niet het platte tekst wachtwoord.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-011-2",
+      "reqId": "REQ-011",
+      "given": "Een gebruiker probeert in te loggen met het correcte wachtwoord 'SecureP@ssw0rd1'.",
+      "when": "Het ingevoerde wachtwoord wordt vergeleken met het opgeslagen gehashte wachtwoord.",
+      "then": "De login is succesvol (HTTP 200) omdat het gehashte wachtwoord overeenkomt met het ingevoerde wachtwoord.",
+      "testType": "integration"
+    },
+    {
+      "acId": "AC-011-3",
+      "reqId": "REQ-011",
+      "given": "Een gebruiker probeert in te loggen met een incorrect wachtwoord 'WrongP@ssw0rd'.",
+      "when": "Het ingevoerde wachtwoord wordt vergeleken met het opgeslagen gehashte wachtwoord.",
+      "then": "De login faalt (bv. HTTP 401) omdat het gehashte wachtwoord niet overeenkomt met het ingevoerde wachtwoord.",
+      "testType": "integration"
+    }
+  ],
+  "traceability": [
+    {
+      "reqId": "REQ-001",
+      "backendRefs": [
+        "ProductController",
+        "ProductService",
+        "ProductRepository",
+        "CartController",
+        "CartService",
+        "OrderController",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "ProductListPage",
+        "ProductDetailPage",
+        "CartPage",
+        "CheckoutPage",
+        "OrderHistoryPage"
+      ],
+      "testRefs": [
+        "Testen van het zoeken en filteren van producten.",
+        "Testen van het toevoegen van producten aan de winkelmand.",
+        "Testen van het afrekenproces.",
+        "Testen van het bekijken van de bestelgeschiedenis."
+      ]
+    },
+    {
+      "reqId": "REQ-002",
+      "backendRefs": [
+        "AdminProductController",
+        "AdminProductService",
+        "AdminOrderController",
+        "AdminOrderService",
+        "ProductRepository",
+        "OrderRepository"
+      ],
+      "frontendRefs": [
+        "AdminProductListPage",
+        "AdminCreateProductPage",
+        "AdminEditProductPage",
+        "AdminOrderListPage",
+        "AdminOrderDetailPage"
+      ],
+      "testRefs": [
+        "Testen van het aanmaken, bewerken en verwijderen van producten door admins.",
+        "Testen van het bekijken en beheren van de voorraad door admins.",
+        "Testen van het bekijken en beheren van bestellingen door admins."
+      ]
+    },
+    {
+      "reqId": "REQ-003",
+      "backendRefs": [],
+      "frontendRefs": [
+        "ProductCard"
+      ],
+      "testRefs": [
+        "Visuele inspectie van de productcard stijl en de zichtbaarheid en functionaliteit van CTA-knoppen."
+      ]
+    },
+    {
+      "reqId": "REQ-004",
+      "backendRefs": [
+        "OrderController",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "CheckoutPage",
+        "OrderSummary"
+      ],
+      "testRefs": [
+        "Testen of het besteloverzicht en de order summary correct worden weergegeven tijdens het checkout proces."
+      ]
+    },
+    {
+      "reqId": "REQ-005",
+      "backendRefs": [],
+      "frontendRefs": [
+        "HomePage",
+        "HeroSection"
+      ],
+      "testRefs": [
+        "Visuele inspectie van de homepage hero sectie, inclusief titel, ondertitel, CTA-knoppen en afbeelding."
+      ]
+    },
+    {
+      "reqId": "REQ-006",
+      "backendRefs": [
+        "ProductController",
+        "ProductService",
+        "ProductRepository"
+      ],
+      "frontendRefs": [
+        "ProductDetailPage",
+        "ProductImageGallery",
+        "ProductDetails",
+        "AddToCartButton",
+        "FavoriteButton"
+      ],
+      "testRefs": [
+        "Testen of alle productinformatie (afbeelding, titel, beschrijving, opties, prijs) correct wordt weergegeven op de productdetailpagina.",
+        "Testen van de functionaliteit van de 'toevoegen aan winkelmand' en 'favoriet' knoppen."
+      ]
+    },
+    {
+      "reqId": "REQ-007",
+      "backendRefs": [
+        "OrderController",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "CheckoutPage",
+        "ShippingForm",
+        "PaymentMethodSelector"
+      ],
+      "testRefs": [
+        "Testen van de invoervelden voor verzendgegevens en de selectie van betaalmethoden (Bancontact, Creditcard) in de checkout."
+      ]
+    },
+    {
+      "reqId": "REQ-008",
+      "backendRefs": [
+        "OrderController",
+        "OrderService"
+      ],
+      "frontendRefs": [
+        "CheckoutPage",
+        "OrderSummary"
+      ],
+      "testRefs": [
+        "Testen of de order summary correct de bestelde items (naam, aantal, prijs) en de totale prijs weergeeft."
+      ]
+    },
+    {
+      "reqId": "REQ-009",
+      "backendRefs": [],
+      "frontendRefs": [
+        "HomePage",
+        "ProductListPage",
+        "ProductDetailPage",
+        "CartPage",
+        "CheckoutPage",
+        "OrderHistoryPage",
+        "LoginPage",
+        "RegisterPage",
+        "AdminDashboardPage"
+      ],
+      "testRefs": [
+        "Testen van de layout en functionaliteit van de applicatie op desktop, tablet en mobiele apparaten."
+      ]
+    },
+    {
+      "reqId": "REQ-010",
+      "backendRefs": [
+        "ProductController",
+        "ProductService"
+      ],
+      "frontendRefs": [
+        "ProductListPage",
+        "ProductCardList"
+      ],
+      "testRefs": [
+        "Meten van de laadtijd van het productoverzicht onder normale belasting om te verifi\u00ebren dat deze binnen 2 seconden laadt."
+      ]
+    },
+    {
+      "reqId": "REQ-011",
+      "backendRefs": [
+        "AuthService",
+        "PasswordHasher"
+      ],
+      "frontendRefs": [],
+      "testRefs": [
+        "Testen van het registratieproces en controleren of wachtwoorden gehasht worden opgeslagen in de database (via inspectie van de database of een gecontroleerde API-call)."
+      ]
+    }
+  ]
+}
