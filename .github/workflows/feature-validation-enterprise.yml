@@ -1,0 +1,331 @@
+name: Feature Validation (Enterprise)
+
+# Triggered by PR comments starting with /validate-feature-
+# Two modes:
+#   /validate-feature-012            → validate changed files only (default)
+#   /validate-feature-012 --changed  → validate changed files only (explicit)
+#   /validate-feature-012 --full     → validate entire codebase
+
+on:
+  issue_comment:
+    types: [created]
+
+env:
+  COPILOT_MODEL: claude-sonnet-4-6
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  models: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    # Only run on PR comments that start with /validate-feature-
+    if: |
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/validate-feature-')
+
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+
+          # Extract feature number/id from comment, e.g. /validate-feature-012
+          FEATURE_NUM="$(echo "$COMMENT" | grep -oP '(?<=/validate-feature-)\S+' | sed 's/--.*$//' | tr -d ' ')"
+          echo "Detected feature token: $FEATURE_NUM"
+
+          # Detect mode
+          if echo "$COMMENT" | grep -q '\-\-full'; then
+            MODE="full"
+          else
+            MODE="changed"
+          fi
+
+          echo "feature_num=$FEATURE_NUM" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE"               >> "$GITHUB_OUTPUT"
+          echo "Mode: $MODE"
+
+      - name: Post "working on it" reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST \
+            "/repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content='+1' || true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve FA and TA paths
+        id: docs
+        env:
+          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+        run: |
+          set -euo pipefail
+
+          FA_PATH="$(find docs/functional-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+          TA_PATH="$(find docs/technical-analysis  -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+
+          if [ -z "$FA_PATH" ]; then
+            echo "::error::FA not found for feature-${FEATURE_NUM} in docs/functional-analysis/"
+            exit 1
+          fi
+          if [ -z "$TA_PATH" ]; then
+            echo "::error::TA not found for feature-${FEATURE_NUM} in docs/technical-analysis/"
+            exit 1
+          fi
+
+          echo "fa_path=$FA_PATH" >> "$GITHUB_OUTPUT"
+          echo "ta_path=$TA_PATH" >> "$GITHUB_OUTPUT"
+          echo "FA: $FA_PATH"
+          echo "TA: $TA_PATH"
+
+      - name: Get PR changed files
+        id: pr_files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          MODE: ${{ steps.parse.outputs.mode }}
+        run: |
+          set -euo pipefail
+
+          CHANGED_FILES="$(gh api \
+            "/repos/${REPO}/pulls/${PR_NUMBER}/files" \
+            --paginate \
+            --jq '.[].filename' 2>/dev/null || true)"
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          > /tmp/code_context.txt
+
+          # Include full file contents for changed files — no truncation needed with 200K context
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              EXT="${file##*.}"
+              case "$EXT" in
+                java|ts|tsx|js|jsx|sql|yaml|yml|json|xml|properties)
+                  printf '\n\n### File: %s\n```\n' "$file" >> /tmp/code_context.txt
+                  cat "$file"                               >> /tmp/code_context.txt
+                  printf '\n```\n'                          >> /tmp/code_context.txt
+                  ;;
+              esac
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [ "$MODE" = "full" ]; then
+            # Scan all known source directories for this feature's project
+            PROJECT_DIR="$(echo "$CHANGED_FILES" | grep '/' | sed 's|/.*||' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')"
+            FEATURE_PREFIX="$(echo "$PROJECT_DIR" | sed 's|-frontend||;s|-backend||')"
+
+            # Build list of directories to scan (frontend + backend if they exist)
+            SCAN_DIRS=""
+            for dir in "${FEATURE_PREFIX}-frontend" "${FEATURE_PREFIX}-backend" "$PROJECT_DIR"; do
+              [ -d "$dir" ] && SCAN_DIRS="$SCAN_DIRS $dir"
+            done
+            SCAN_DIRS="${SCAN_DIRS:-${PROJECT_DIR:-.}}"
+            echo "Full scan dirs:$SCAN_DIRS"
+
+            for SCAN_ROOT in $SCAN_DIRS; do
+              find "$SCAN_ROOT" -path '*/node_modules' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
+                printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
+                head -300 "$f"                             >> /tmp/code_context.txt
+                printf '\n```\n'                           >> /tmp/code_context.txt
+              done || true
+              find "$SCAN_ROOT" -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
+                printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
+                head -300 "$f"                                   >> /tmp/code_context.txt
+                printf '\n```\n'                                 >> /tmp/code_context.txt
+              done || true
+            done
+          fi
+
+          echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED_FILES"     >> "$GITHUB_OUTPUT"
+          echo "EOF"                >> "$GITHUB_OUTPUT"
+
+      - name: Cache Copilot CLI
+        uses: actions/cache@v4
+        id: cache-copilot
+        with:
+          path: ~/.local/bin
+          key: copilot-cli-${{ runner.os }}
+
+      - name: Install Copilot CLI
+        if: steps.cache-copilot.outputs.cache-hit != 'true'
+        run: curl -fsSL https://gh.io/copilot-install | bash
+
+      - name: Run Copilot feature validation
+        id: validation
+        env:
+          GH_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          FA_PATH:     ${{ steps.docs.outputs.fa_path }}
+          TA_PATH:     ${{ steps.docs.outputs.ta_path }}
+          MODE:        ${{ steps.parse.outputs.mode }}
+          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+          PR_NUMBER:   ${{ github.event.issue.number }}
+          REPO:        ${{ github.repository }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          set -euo pipefail
+
+          PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
+          PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
+
+          MODE_LABEL="changed files only"
+          [ "$MODE" = "full" ] && MODE_LABEL="full codebase"
+
+          if [ "$MODE" = "full" ]; then
+            TASK_DESCRIPTION="Your task: validate whether the CODEBASE already implements the feature described in the FA and TA. The code context below is a scan of the full codebase — judge what is implemented there, regardless of what the PR itself changed."
+          else
+            TASK_DESCRIPTION="Your task: validate whether the PR code correctly implements the feature described in the FA and TA. Only judge based on the changed files in the PR."
+          fi
+
+          {
+            echo "You are an expert software engineer doing a feature compliance review."
+            echo ""
+            echo "You are given:"
+            echo "1. A Functional Analysis (FA) document describing the feature requirements"
+            echo "2. A Technical Analysis (TA) document describing the technical design"
+            echo "3. Code context (${MODE_LABEL})"
+            echo ""
+            echo "${TASK_DESCRIPTION}"
+            echo ""
+            echo "═══════════════════════════════════════"
+            echo "FUNCTIONAL ANALYSIS (FA)"
+            echo "═══════════════════════════════════════"
+            cat "$FA_PATH"
+            echo ""
+            echo "═══════════════════════════════════════"
+            echo "TECHNICAL ANALYSIS (TA)"
+            echo "═══════════════════════════════════════"
+            cat "$TA_PATH"
+            echo ""
+            echo "═══════════════════════════════════════"
+            echo "CODE CONTEXT (${MODE_LABEL})"
+            echo "═══════════════════════════════════════"
+            echo "PR Title: ${PR_TITLE}"
+            echo "PR Description: ${PR_BODY}"
+            echo ""
+            cat /tmp/code_context.txt
+            echo ""
+            echo "═══════════════════════════════════════"
+            echo "VALIDATION INSTRUCTIONS"
+            echo "═══════════════════════════════════════"
+            echo "Write a structured Markdown validation report with these exact sections:"
+            echo ""
+            echo "## 📋 FA Validation"
+            echo ""
+            echo "### Requirements"
+            echo "For each REQ-xxx found in the FA: ✅ implemented / ❌ missing / ⚠️ partial — with a short reason."
+            echo ""
+            echo "### Business Rules"
+            echo "For each BR-xxx found in the FA: ✅ enforced / ❌ missing / ⚠️ partial — with a short reason."
+            echo ""
+            echo "### Acceptance Criteria"
+            echo "For each AC-xxx found in the FA: ✅ covered / ❌ not covered / ⚠️ partial — with a short reason."
+            echo ""
+            echo "### Non-Functional Requirements"
+            echo "For each NFR-xxx found in the FA: ✅ addressed / ❌ missing / ⚠️ partial — with a short reason."
+            echo ""
+            echo "## 🔧 TA Validation"
+            echo ""
+            echo "### API Contracts"
+            echo "Check if the implemented endpoints match the TA (paths, methods, request/response structure, status codes)."
+            echo "List each endpoint: ✅ correct / ❌ wrong / ⚠️ partial."
+            echo ""
+            echo "### Domain Model & Database"
+            echo "Check if entities, fields, constraints and relations match the TA domain model and ERD."
+            echo "List findings per entity."
+            echo ""
+            echo "### Backend Design"
+            echo "Check if the controller/service/repository structure matches the TA backend design."
+            echo ""
+            echo "### Frontend Design"
+            echo "Check if components and routes match the TA frontend design (if applicable to this PR)."
+            echo ""
+            echo "## 📊 Summary"
+            echo ""
+            echo "| Category | ✅ OK | ⚠️ Partial | ❌ Missing |"
+            echo "|----------|-------|-----------|---------|"
+            echo "| Requirements | X | X | X |"
+            echo "| Business Rules | X | X | X |"
+            echo "| Acceptance Criteria | X | X | X |"
+            echo "| NFR | X | X | X |"
+            echo "| API Contracts | X | X | X |"
+            echo "| Domain Model | X | X | X |"
+            echo ""
+            echo "## 🏁 Verdict"
+            echo ""
+            echo "**PASS** / **PARTIAL** / **FAIL** — one sentence overall conclusion."
+            echo ""
+            echo "Important rules:"
+            echo "- Be specific: reference exact REQ/BR/AC/NFR numbers and exact field/endpoint names"
+            echo "- If code is not available for a check, mark it as ⚠️ and state why"
+            echo "- Do NOT invent requirements — only validate against what is written in FA and TA"
+            echo "- Keep each bullet concise (1 line max)"
+          } > copilot-prompt.txt
+
+          PROMPT_BYTES=$(wc -c < copilot-prompt.txt)
+          echo "Prompt size: ${PROMPT_BYTES} bytes"
+          if [ "$PROMPT_BYTES" -gt 800000 ]; then
+            echo "::error::Prompt exceeds 800KB (${PROMPT_BYTES} bytes) — too large for Claude Sonnet 4.6's 200K token context"
+            exit 1
+          elif [ "$PROMPT_BYTES" -gt 400000 ]; then
+            echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — approaching context limit"
+          fi
+
+          # Run Copilot CLI and capture output
+          copilot -p "$(cat copilot-prompt.txt)" \
+            --model "$COPILOT_MODEL" \
+            --no-ask-user \
+            2>&1 | head -c 5242880 | tee /tmp/validation-output.log || true
+
+          COPILOT_EXIT=${PIPESTATUS[0]}
+          # 141 = 128+13 = SIGPIPE, expected when head -c truncates — not a real failure
+          if [ "$COPILOT_EXIT" -ne 0 ] && [ "$COPILOT_EXIT" -ne 141 ]; then
+            REPORT="⚠️ Copilot CLI failed (exit ${COPILOT_EXIT}) — check COPILOT_PAT secret and CLI flags."
+          else
+            REPORT="$(cat /tmp/validation-output.log)"
+          fi
+
+          rm -f copilot-prompt.txt
+
+          # Post validation report as PR comment
+          {
+            echo "## 🔍 Feature Validation (Enterprise) — \`feature-${FEATURE_NUM}\`"
+            echo
+            echo "> **Mode:** ${MODE_LABEL} | **Model:** ${COPILOT_MODEL}"
+            echo
+            echo "$REPORT"
+            echo
+            echo "---"
+            echo "_Validation triggered by @${{ github.event.comment.user.login }} · $(date -u '+%Y-%m-%d %H:%M UTC')_"
+          } > /tmp/validation-report.md
+
+          gh pr comment "$PR_NUMBER" --body-file /tmp/validation-report.md
+
+      - name: Handle docs not found
+        if: failure() && steps.docs.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "❌ **Feature Validation (Enterprise) failed** — could not find FA or TA documents for \`feature-${FEATURE_NUM}\`.
+
+          Make sure these files exist:
+          - \`docs/functional-analysis/feature-${FEATURE_NUM}*.md\`
+          - \`docs/technical-analysis/feature-${FEATURE_NUM}*.md\`" || true
