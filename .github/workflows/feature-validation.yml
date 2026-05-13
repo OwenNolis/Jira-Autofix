@@ -120,12 +120,17 @@ jobs:
           done <<< "$CHANGED_FILES"
 
           if [ "$MODE" = "full" ]; then
-            find . -path '*/backend/src/main' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
+            # Detect project root from changed files so we scan the right app, not the whole repo
+            PROJECT_DIR="$(echo "$CHANGED_FILES" | grep '/' | sed 's|/.*||' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')"
+            SCAN_ROOT="${PROJECT_DIR:-.}"
+            echo "Full scan root: $SCAN_ROOT"
+
+            find "$SCAN_ROOT" -path '*/node_modules' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
               printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
               head -150 "$f"                            >> /tmp/code_context.txt
               printf '\n```\n'                          >> /tmp/code_context.txt
             done || true
-            find . -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
+            find "$SCAN_ROOT" -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
               printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
               head -150 "$f"                                  >> /tmp/code_context.txt
               printf '\n```\n'                                >> /tmp/code_context.txt
