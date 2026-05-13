@@ -1,0 +1,127 @@
+.orders-page {
+  padding: 2rem;
+}
+
+.orders-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.orders-title {
+  color: #fff;
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 2rem;
+}
+
+.orders-login-prompt,
+.orders-empty {
+  text-align: center;
+  padding: 6rem 2rem;
+}
+
+.orders-login-prompt h2,
+.orders-empty p {
+  color: #e0e0e0;
+  margin-bottom: 1.5rem;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.order-card {
+  background: #1a2a3a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #263545;
+}
+
+.order-id {
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-right: 12px;
+}
+
+.order-date {
+  color: #90a4ae;
+  font-size: 0.85rem;
+}
+
+.order-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status--pending  { background: rgba(249, 168, 37, 0.15); color: #f9a825; }
+.status--paid     { background: rgba(0, 191, 165, 0.15);  color: #00bfa5; }
+.status--shipped  { background: rgba(41, 182, 246, 0.15); color: #29b6f6; }
+.status--delivered{ background: rgba(0, 200, 83, 0.15);  color: #00c853; }
+.status--cancelled{ background: rgba(117, 117, 117, 0.2); color: #757575; }
+
+.order-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.order-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.order-line-name {
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.order-line-meta {
+  color: #90a4ae;
+  font-size: 0.85rem;
+}
+
+.order-line-price {
+  color: #b0bec5;
+  font-size: 0.85rem;
+  min-width: 60px;
+  text-align: right;
+}
+
+.order-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #263545;
+}
+
+.order-total-label {
+  color: #90a4ae;
+  font-size: 0.9rem;
+}
+
+.order-total-price {
+  color: #00bfa5;
+  font-size: 1.1rem;
+}

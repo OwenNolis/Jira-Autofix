@@ -1,0 +1,128 @@
+.filter-sidebar {
+  background: #1a2a3a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 260px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  position: sticky;
+  top: 80px;
+}
+
+.filter-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.filter-sidebar-header h2 {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.filter-reset-btn {
+  background: none;
+  border: 1px solid #00bfa5;
+  color: #00bfa5;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.filter-reset-btn:hover {
+  background: #00bfa5;
+  color: #0d1b2a;
+}
+
+.filter-group {
+  margin-bottom: 1.25rem;
+}
+
+.filter-label {
+  display: block;
+  color: #90a4ae;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.filter-input {
+  width: 100%;
+  background: #0d1b2a;
+  border: 1px solid #263545;
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filter-input:focus {
+  border-color: #00bfa5;
+}
+
+.filter-input--sm {
+  width: calc(50% - 8px);
+}
+
+.filter-select {
+  width: 100%;
+  background: #0d1b2a;
+  border: 1px solid #263545;
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.filter-select:focus {
+  border-color: #00bfa5;
+}
+
+.filter-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-range-sep {
+  color: #90a4ae;
+  flex-shrink: 0;
+}
+
+.filter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.filter-checkbox-label input[type='checkbox'] {
+  accent-color: #00bfa5;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .filter-sidebar {
+    width: 100%;
+    position: static;
+  }
+}

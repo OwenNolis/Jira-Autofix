@@ -1,0 +1,97 @@
+.hero {
+  background: linear-gradient(135deg, #0d1b2a 0%, #1a3a4a 60%, #004d40 100%);
+  padding: 6rem 2rem 5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse at center, rgba(0, 191, 165, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.hero-tag {
+  color: #00bfa5;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin: 0 0 1rem;
+}
+
+.hero h1 {
+  color: #fff;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 0 0 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.hero h1 span {
+  color: #00bfa5;
+}
+
+.hero-sub {
+  color: #90a4ae;
+  font-size: 1.1rem;
+  margin: 0 0 2rem;
+  line-height: 1.6;
+}
+
+.shop-section {
+  display: flex;
+  gap: 2rem;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+  align-items: flex-start;
+}
+
+.shop-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.shop-results-bar {
+  color: #90a4ae;
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.shop-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #90a4ae;
+}
+
+.shop-empty p {
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 900px) {
+  .shop-section {
+    flex-direction: column;
+  }
+}
