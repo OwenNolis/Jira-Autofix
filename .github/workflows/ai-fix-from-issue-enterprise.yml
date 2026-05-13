@@ -131,7 +131,7 @@ jobs:
           # Build repository file tree
           FILE_TREE=$(git ls-files \
             | grep -E '\.(ts|tsx|js|jsx|css|scss|html|json)$' \
-            | sort | head -100)
+            | sort)
           
           # Embed COMPLETE source file contents + package.json so AI knows
           # exactly what packages are installed and can add new ones if needed
