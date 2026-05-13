@@ -370,9 +370,9 @@ jobs:
         run: |
           git config --global user.name "AI Issue Fixer"
           git config --global user.email "ai-fixer@github.com"
-          
+
           JIRA_KEY="${{ steps.build_prompt.outputs.jira_key }}"
-          
+
           # Create a branch using the Jira key
           if [ -z "$JIRA_KEY" ]; then
             echo "❌ No Jira key found in issue body — cannot create branch"
@@ -380,27 +380,22 @@ jobs:
           fi
           BRANCH="feature/${JIRA_KEY}"
           git checkout -b "$BRANCH"
-          
+
           git add -A
-          
+
           # Commit — include "Fixes #N" so GitHub auto-closes the issue on merge
           COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
           SCOPE="${{ steps.apply_changes.outputs.scope }}"
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated code changes")
-          COMMIT_BODY="Fixes #${ISSUE_NUMBER}"
-          [ -n "$JIRA_KEY" ] && COMMIT_BODY=$(printf '%s\nJira: %s' "$COMMIT_BODY" "$JIRA_KEY")
-          COMMIT_MSG=$(printf '%s: AI-generated fix for issue #%s\n\n%s\n\n%s' \
-            "$COMMIT_TYPE" "$ISSUE_NUMBER" "$ANALYSIS" "$COMMIT_BODY")
+          COMMIT_MSG=$(printf '%s: AI-generated fix for issue #%s\n\nFixes #%s\nJira: %s\n\n%s' \
+            "$COMMIT_TYPE" "$ISSUE_NUMBER" "$ISSUE_NUMBER" "$JIRA_KEY" "$ANALYSIS")
           git commit -m "$COMMIT_MSG"
 
           git push origin "$BRANCH"
 
-          # Build PR title using conventional commit format
+          # Build PR title and body
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
           PR_TITLE="${COMMIT_TYPE}(${SCOPE}): ${JIRA_KEY} - ${CLEAN_TITLE}"
-          
-          # Build PR body — embed the Jira key so the later used workflow close-on-merge.yml/downstream automation can find it
-          ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated fix")
           CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | awk 'NF{printf "- `%s`\n", $0}')
           JIRA_DOMAIN_CLEAN="${JIRA_DOMAIN%/}"
           
@@ -441,9 +436,7 @@ jobs:
           PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // empty')
           
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-          echo "jira_key=$JIRA_KEY" >> $GITHUB_OUTPUT
-          echo "clean_title=$CLEAN_TITLE" >> $GITHUB_OUTPUT
+          echo "pr_url=$PR_URL"     >> $GITHUB_OUTPUT
           echo "✅ PR #${PR_NUMBER} created: $PR_URL"
 
       - name: Comment on issue with PR link
@@ -452,8 +445,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "See PR for details.")
-          JIRA_KEY="${{ steps.create_pr.outputs.jira_key }}"
-          CLEAN_TITLE="${{ steps.create_pr.outputs.clean_title }}"
+          JIRA_KEY="${{ steps.build_prompt.outputs.jira_key }}"
+          CLEAN_TITLE=$(echo "${{ steps.build_prompt.outputs.title }}" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
           if [ -n "$JIRA_KEY" ]; then
             HEADER="🤖 **AI-Generated Fix — Refs:${JIRA_KEY} - ${CLEAN_TITLE}**"
           else
