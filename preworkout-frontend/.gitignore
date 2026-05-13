@@ -4,7 +4,7 @@ node_modules/
 # production build
 build/
 
-# environment files
+# environment files (keep .env.example tracked)
 .env
 .env.local
 .env.development.local
