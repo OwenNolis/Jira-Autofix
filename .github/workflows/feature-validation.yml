@@ -176,14 +176,20 @@ jobs:
           MODE_LABEL="changed files only"
           [ "$MODE" = "full" ] && MODE_LABEL="full codebase"
 
+          if [ "$MODE" = "full" ]; then
+            TASK_DESCRIPTION="Your task: validate whether the CODEBASE already implements the feature described in the FA and TA. The code context below is a scan of the full codebase — judge what is implemented there, regardless of what the PR itself changed."
+          else
+            TASK_DESCRIPTION="Your task: validate whether the PR code correctly implements the feature described in the FA and TA. Only judge based on the changed files in the PR."
+          fi
+
           PROMPT="You are an expert software engineer doing a feature compliance review.
 
           You are given:
           1. A Functional Analysis (FA) document describing the feature requirements
           2. A Technical Analysis (TA) document describing the technical design
-          3. Code context from the PR (${MODE_LABEL})
+          3. Code context (${MODE_LABEL})
 
-          Your task: validate whether the PR code correctly implements the feature described in the FA and TA.
+          ${TASK_DESCRIPTION}
 
           ═══════════════════════════════════════
           FUNCTIONAL ANALYSIS (FA)
