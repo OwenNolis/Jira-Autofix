@@ -30,6 +30,7 @@ import base64
 import json
 import os
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TypedDict
@@ -183,6 +184,17 @@ def llm_json(prompt: str) -> dict:
 
 
 def llm_text(prompt: str) -> str:
+    for attempt in range(5):
+        try:
+            response = get_llm().invoke([HumanMessage(content=prompt)])
+            return response.content.strip()
+        except Exception as e:
+            if "429" in str(e) or "RateLimitReached" in str(e) or "RateLimitError" in type(e).__name__:
+                wait = 2 ** attempt
+                print(f"  ⏳ Rate limited, retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                raise
     response = get_llm().invoke([HumanMessage(content=prompt)])
     return response.content.strip()
 
@@ -1107,7 +1119,7 @@ Gegevens: {json.dumps(state["tests_design"], indent=2)}
         return idx, result
 
     print("  📝 Generating sections 1-11 in parallel...")
-    with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [executor.submit(_run_section, i, p) for i, p in enumerate(prompts)]
         for f in futures:
             idx, result = f.result()
