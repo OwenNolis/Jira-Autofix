@@ -288,13 +288,13 @@ Het feature-id voor dit document is: {feature_id}
 
 # ── Conversion ─────────────────────────────────────────────────────────────────
 
-def _build_image_content(page_images: list[Path]) -> list[dict]:
+def _build_image_content(page_images: list[Path], detail: str = "low") -> list[dict]:
     content: list[dict] = []
     for img_path in page_images:
         b64 = base64.standard_b64encode(img_path.read_bytes()).decode()
         content.append({
             "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{b64}"},
+            "image_url": {"url": f"data:image/png;base64,{b64}", "detail": detail},
         })
     return content
 
