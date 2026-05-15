@@ -1410,7 +1410,14 @@ def _extract_fa_images(fa_text: str, fa_path: Path, ta_path: Path) -> dict[str, 
         alt = m.group(1).strip()
         src = m.group(2).strip()
 
-        if src.startswith("http") or src.startswith("https") or src.startswith("data:"):
+        if src.startswith(("http://", "https://")):
+            continue
+
+        if src.startswith("data:"):
+            md_ref = f"![{alt}]({src})"
+            cat = current_cat or _categorize_section(alt)
+            if cat and cat in result:
+                result[cat].append(md_ref)
             continue
 
         img_abs = (fa_path.parent / src).resolve()
