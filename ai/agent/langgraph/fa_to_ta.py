@@ -158,7 +158,8 @@ SKELETONS_DIR = Path(__file__).parent / "templates" / "skeletons"
 
 class TAState(TypedDict):
     feature_id: str
-    fa_content: str
+    fa_content: str        # full content with image descriptions (for section generation)
+    fa_content_text: str   # compact version with image descriptions stripped (for classification/parsing)
     fa_path_str: str
     ta_path_str: str
     fa_type: str
@@ -249,7 +250,7 @@ Lees de onderstaande Functionele Analyse en bepaal het type feature.
 
 FA inhoud:
 ---
-{state["fa_content"]}
+{state["fa_content_text"]}
 ---
 
 Kies EXACT één van de volgende types:
@@ -287,10 +288,11 @@ def parse_fa(state: TAState) -> dict:
     import re as _re
     print("🔍 Parsing FA...")
 
-    fa_text = state["fa_content"]
-    fa_req_ids  = _re.findall(r'\bREQ-\d+\b', fa_text)
-    fa_br_ids   = _re.findall(r'\bBR-\d+\b',  fa_text)
-    fa_nfr_ids  = _re.findall(r'\bNFR-\d+\b', fa_text)
+    fa_full = state["fa_content"]       # for regex scans (keeps all text including descriptions)
+    fa_text = state["fa_content_text"]  # compact version for LLM prompt
+    fa_req_ids  = _re.findall(r'\bREQ-\d+\b', fa_full)
+    fa_br_ids   = _re.findall(r'\bBR-\d+\b',  fa_full)
+    fa_nfr_ids  = _re.findall(r'\bNFR-\d+\b', fa_full)
     n_reqs  = len(set(fa_req_ids))
     n_brs   = len(set(fa_br_ids))
     n_nfrs  = len(set(fa_nfr_ids))
@@ -1295,6 +1297,30 @@ def _clean_messaging(raw: dict) -> dict:
     }
 
 
+def compact_fa_content(fa_content: str) -> str:
+    """Strip verbose image-description blocks, keeping only the **[Afbeelding: X]** label.
+
+    expand_fa_images writes blocks of the form:
+        <!-- Afbeelding: name -->
+        **[Afbeelding: name]**
+
+        [multi-paragraph description]
+
+    This function collapses each block to just the label line so the content
+    fits within token limits for classification and parsing steps.
+    """
+    import re as _re
+    return _re.sub(
+        r'<!-- Afbeelding:[^\n]*\n'       # comment line
+        r'(\*\*\[Afbeelding:[^\]]*\]\*\*)'  # capture label line
+        r'\n\n.*?'                        # blank line + description (non-greedy)
+        r'(?=\n<!-- Afbeelding:|\n##|\Z)',  # until next block, heading, or end
+        r'\1\n',
+        fa_content,
+        flags=_re.DOTALL,
+    )
+
+
 def expand_fa_images(fa_text: str, fa_path: Path) -> str:
     import re as _re
     pattern = _re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
@@ -1553,9 +1579,11 @@ def main():
     extra_context = "\n\n".join(context_parts)
 
     app = build_graph()
+    _fa_content = expand_fa_images(fa_path.read_text(), fa_path)
     final = app.invoke({
         "feature_id":       feature_id,
-        "fa_content":       expand_fa_images(fa_path.read_text(), fa_path),
+        "fa_content":       _fa_content,
+        "fa_content_text":  compact_fa_content(_fa_content),
         "fa_path_str":      str(fa_path),
         "ta_path_str":      str(ta_md_path),
         "fa_type":          "",
