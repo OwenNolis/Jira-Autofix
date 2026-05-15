@@ -1075,10 +1075,10 @@ In scope en out of scope als bullet-lijsten.
 Gegevens: {json.dumps(state["scope"], indent=2)}
 
 ## 2. Assumptions
-{json.dumps(state["assumptions"], indent=2)}
+{json.dumps(state["assumptions"], indent=2) if state["assumptions"] else "*Geen aannames gedefinieerd.*"}
 
 ## 3. Open Questions
-{json.dumps(state["open_questions"], indent=2)}
+{json.dumps(state["open_questions"], indent=2) if state["open_questions"] else "*Geen open vragen gedefinieerd.*"}
 """,
         f"""{base_instruction}
 
