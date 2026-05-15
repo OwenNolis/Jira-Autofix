@@ -102,6 +102,42 @@ def _describe_image(f: Path) -> str:
     return response.content.strip()
 
 
+def _describe_image_data(data_uri: str) -> str:
+    """Describe an image given as a base64 data URI (data:mime;base64,...)."""
+    message = HumanMessage(content=[
+        {
+            "type": "image_url",
+            "image_url": {"url": data_uri},
+        },
+        {
+            "type": "text",
+            "text": (
+                "Je bent een SDLC-documentatie assistent. "
+                "Analyseer deze afbeelding en beschrijf de inhoud VOLLEDIG en EXACT in gestructureerde tekst "
+                "zodat het bruikbaar is als context voor het genereren van een Technische Analyse.\n\n"
+                "KRITIEKE REGELS — deze gelden altijd, zonder uitzondering:\n"
+                "- Neem ELK zichtbaar veld op van ELKE entiteit, klasse of component in de afbeelding\n"
+                "- Noteer bij elk veld: de exacte naam, het exacte type en eventuele zichtbare constraints\n"
+                "- Noteer alle relaties met hun multipliciteit (bv. 1, 0..*, 1..*, 0..1)\n"
+                "- Noteer ALLE enum-waarden exact zoals ze in de afbeelding staan\n"
+                "- Kopieer namen exact (hoofdletters, camelCase, underscores) — verzin geen synoniemen\n\n"
+                "Diagramtype-specifieke instructies:\n"
+                "- Domeinmodel / ERD / UML class diagram: per entiteit een ### heading, "
+                "daarna een bullet-lijst met alle velden (naam: type — constraints), "
+                "gevolgd door een 'Relaties' subsectie\n"
+                "- Sequentiediagram: actoren en stappen op volgorde\n"
+                "- Flowchart / procesdiagram: elke stap en beslissing\n"
+                "- UI-mockup / wireframe: schermopbouw, componenten en interacties\n"
+                "- Architectuurdiagram: services, verbindingen en verantwoordelijkheden\n\n"
+                "Geef de beschrijving in het Nederlands. Gebruik koppen en bullet-lijsten."
+            ),
+        },
+    ])
+    llm = get_llm()
+    response = llm.invoke([message])
+    return response.content.strip()
+
+
 def read_context_file(f: Path) -> str:
     suffix = f.suffix.lower()
     if suffix in IMAGE_EXTENSIONS:
@@ -1268,8 +1304,19 @@ def expand_fa_images(fa_text: str, fa_path: Path) -> str:
         alt_text = match.group(1)
         img_src  = match.group(2).strip()
 
-        if img_src.startswith("http://") or img_src.startswith("https://") or img_src.startswith("data:"):
+        if img_src.startswith(("http://", "https://")):
             return match.group(0)
+
+        if img_src.startswith("data:"):
+            label = alt_text if alt_text else "afbeelding"
+            print(f"  🖼️  Analysing embedded image (FA): {label}")
+            description = _describe_image_data(img_src)
+            print(f"  ✅ Embedded image processed (FA): {label}")
+            return (
+                f"<!-- Afbeelding: {label} -->\n"
+                f"**[Afbeelding: {label}]**\n\n"
+                f"{description}\n"
+            )
 
         img_path = (fa_dir / img_src).resolve()
         if not img_path.is_file():

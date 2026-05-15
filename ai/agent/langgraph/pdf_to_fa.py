@@ -472,6 +472,25 @@ def _count_pdf_pages(pdf_path: Path) -> int | None:
     return None
 
 
+def _inline_images(markdown: str, base_dir: Path) -> str:
+    """Replace relative image paths with base64 data URIs so the .md is self-contained."""
+    _MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+             ".gif": "image/gif", ".webp": "image/webp"}
+
+    def _replace(m: re.Match) -> str:
+        alt, src = m.group(1), m.group(2).strip()
+        if src.startswith(("http://", "https://", "data:")):
+            return m.group(0)
+        img_path = (base_dir / src).resolve()
+        mime = _MIME.get(img_path.suffix.lower())
+        if not img_path.is_file() or not mime:
+            return m.group(0)
+        data = base64.standard_b64encode(img_path.read_bytes()).decode()
+        return f"![{alt}](data:{mime};base64,{data})"
+
+    return re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', _replace, markdown)
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -566,6 +585,7 @@ def main():
         for w in warnings:
             print(f"   - {w}")
 
+    fa_markdown = _inline_images(fa_markdown, output_dir)
     output_path.write_text(fa_markdown, encoding="utf-8")
 
     print(f"\n✅ FA Markdown saved : {output_path}")
