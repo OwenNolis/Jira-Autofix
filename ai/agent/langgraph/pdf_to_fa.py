@@ -138,7 +138,7 @@ def get_llm() -> ChatOpenAI:
         print("❌ GITHUB_TOKEN not set", file=sys.stderr)
         sys.exit(1)
     return ChatOpenAI(
-        model=os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5"),
+        model=os.environ.get("CLAUDE_MODEL", "gpt-4o"),
         base_url="https://models.inference.ai.azure.com",
         api_key=api_key,
         temperature=0,
