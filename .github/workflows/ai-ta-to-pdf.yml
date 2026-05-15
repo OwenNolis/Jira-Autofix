@@ -36,7 +36,7 @@ jobs:
           FEATURE_ID="$(echo "$COMMENT" | grep -oP '(?<=/ta-to-pdf )\S+' | head -1)"
           echo "Feature ID: $FEATURE_ID"
 
-          TA_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' | head -1 || true)"
+          TA_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/(?:assets|files)/[^\s\)]+' | head -1 || true)"
           echo "TA URL: $TA_URL"
 
           echo "feature_id=$FEATURE_ID" >> "$GITHUB_OUTPUT"

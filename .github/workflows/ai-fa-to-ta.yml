@@ -37,8 +37,8 @@ jobs:
           FEATURE_ID="$(echo "$COMMENT" | grep -oP '(?<=/fa-to-ta )\S+' | head -1)"
           echo "Feature ID: $FEATURE_ID"
 
-          # Find the first markdown attachment URL in the comment
-          FA_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' | head -1 || true)"
+          # Find the first markdown attachment URL in the comment (assets/ or files/)
+          FA_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/(?:assets|files)/[^\s\)]+' | head -1 || true)"
           echo "FA URL: $FA_URL"
 
           echo "feature_id=$FEATURE_ID" >> "$GITHUB_OUTPUT"
@@ -60,14 +60,15 @@ jobs:
           FA_URL: ${{ steps.parse.outputs.fa_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           if [ -z "$FEATURE_ID" ]; then
-            gh pr comment "$PR_NUMBER" --body "❌ **FA to TA failed** — could not parse feature ID.
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **FA to TA failed** — could not parse feature ID.
           Expected: \`/fa-to-ta feature-012-my-feature\`" || true
             exit 1
           fi
           if [ -z "$FA_URL" ]; then
-            gh pr comment "$PR_NUMBER" --body "❌ **FA to TA failed** — no FA file attachment found.
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **FA to TA failed** — no FA file attachment found.
           Please drag-drop the FA \`.md\` file into your comment alongside the command." || true
             exit 1
           fi

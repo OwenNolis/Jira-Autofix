@@ -38,7 +38,7 @@ jobs:
           FEATURE_ID="$(echo "$COMMENT" | grep -oP '(?<=/pdf-to-fa )\S+' | head -1)"
           echo "Feature ID: $FEATURE_ID"
 
-          PDF_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' | head -1 || true)"
+          PDF_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/(?:assets|files)/[^\s\)]+' | head -1 || true)"
           if [ -z "$PDF_URL" ]; then
             # Also try githubusercontent.com attachment format
             PDF_URL="$(echo "$COMMENT" | grep -oP 'https://[^\s\)]+\.pdf' | head -1 || true)"
@@ -67,12 +67,12 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           if [ -z "$FEATURE_ID" ]; then
-            gh pr comment "$PR_NUMBER" --body "❌ **PDF to FA failed** — could not parse feature ID from command.
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **PDF to FA failed** — could not parse feature ID from command.
           Expected: \`/pdf-to-fa feature-012-my-feature\`" || true
             exit 1
           fi
           if [ -z "$PDF_URL" ]; then
-            gh pr comment "$PR_NUMBER" --body "❌ **PDF to FA failed** — no PDF attachment found in comment.
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **PDF to FA failed** — no PDF attachment found in comment.
           Please drag-drop a PDF file into your comment alongside the command." || true
             exit 1
           fi
