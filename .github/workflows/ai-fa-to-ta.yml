@@ -1,0 +1,164 @@
+name: AI — FA to TA
+
+# Triggered by PR comments:
+#   /fa-to-ta feature-012-my-feature
+#   [feature-012-my-feature.md](https://github.com/user-attachments/assets/...)
+#
+# Drag-drop the FA markdown file into the comment. The workflow downloads it,
+# runs fa_to_ta.py via Claude Sonnet on GitHub Models, and posts the TA as a
+# PR comment. A zip artifact is also uploaded for download.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  models: read
+
+jobs:
+  fa-to-ta:
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/fa-to-ta ')
+
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+
+          FEATURE_ID="$(echo "$COMMENT" | grep -oP '(?<=/fa-to-ta )\S+' | head -1)"
+          echo "Feature ID: $FEATURE_ID"
+
+          # Find the first markdown attachment URL in the comment
+          FA_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' | head -1 || true)"
+          echo "FA URL: $FA_URL"
+
+          echo "feature_id=$FEATURE_ID" >> "$GITHUB_OUTPUT"
+          echo "fa_url=$FA_URL"         >> "$GITHUB_OUTPUT"
+
+      - name: Post reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST \
+            "/repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content='+1' || true
+
+      - name: Validate inputs
+        env:
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+          FA_URL: ${{ steps.parse.outputs.fa_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ -z "$FEATURE_ID" ]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **FA to TA failed** — could not parse feature ID.
+          Expected: \`/fa-to-ta feature-012-my-feature\`" || true
+            exit 1
+          fi
+          if [ -z "$FA_URL" ]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **FA to TA failed** — no FA file attachment found.
+          Please drag-drop the FA \`.md\` file into your comment alongside the command." || true
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --quiet \
+            langchain-openai langchain-core langgraph \
+            pymupdf pillow python-dotenv pypdf jsonschema
+
+      - name: Download FA markdown
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FA_URL: ${{ steps.parse.outputs.fa_url }}
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+        run: |
+          # Set up workspace with expected folder structure
+          mkdir -p /tmp/workspace/docs/functional-analysis
+          mkdir -p /tmp/workspace/docs/technical-analysis
+
+          curl -sS -L \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$FA_URL" \
+            -o "/tmp/workspace/docs/functional-analysis/${FEATURE_ID}.md"
+
+          echo "Downloaded FA: $(wc -l < /tmp/workspace/docs/functional-analysis/${FEATURE_ID}.md) lines"
+
+          # Copy schema from checked-out repo
+          mkdir -p /tmp/workspace/ai/schemas
+          cp -r ai/schemas/. /tmp/workspace/ai/schemas/ 2>/dev/null || true
+
+      - name: Run FA to TA conversion
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+          AISDLC_REPO_ROOT: /tmp/workspace
+        run: |
+          python ai/agent/langgraph/fa_to_ta.py "$FEATURE_ID"
+
+      - name: Post TA as PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+        run: |
+          TA_FILE="/tmp/workspace/docs/technical-analysis/${FEATURE_ID}.md"
+
+          if [ ! -f "$TA_FILE" ]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **FA to TA failed** — output file not found." || true
+            exit 1
+          fi
+
+          TA_CONTENT="$(cat "$TA_FILE")"
+          CHAR_COUNT="${#TA_CONTENT}"
+          TRUNCATED=""
+
+          if [ "$CHAR_COUNT" -gt 60000 ]; then
+            TA_CONTENT="$(echo "$TA_CONTENT" | head -c 60000)"
+            TRUNCATED="⚠️ _Content truncated at 60 000 characters. Download the full file from the artifact below._"
+          fi
+
+          {
+            echo "## 🔧 Generated TA — \`${FEATURE_ID}\`"
+            echo
+            echo "> Download the full file from the **Actions artifact** on this run."
+            echo "> Re-drop the \`.md\` file in a new comment to run \`/ta-to-pdf\` or \`/validate-feature-${FEATURE_ID}\`."
+            echo
+            echo "---"
+            echo
+            echo "$TA_CONTENT"
+            echo
+            if [ -n "$TRUNCATED" ]; then echo "$TRUNCATED"; fi
+            echo
+            echo "---"
+            echo "_Generated by @${{ github.event.comment.user.login }} · $(date -u '+%Y-%m-%d %H:%M UTC')_"
+          } > /tmp/ta-comment.md
+
+          gh pr comment "$PR_NUMBER" --body-file /tmp/ta-comment.md
+
+      - name: Upload TA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ta-${{ steps.parse.outputs.feature_id }}
+          path: /tmp/workspace/docs/technical-analysis/
+          retention-days: 30

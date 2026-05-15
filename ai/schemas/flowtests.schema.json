@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/flowtests.schema.json",
+  "title": "Flow Based Test Scenarios",
+  "type": "object",
+  "required": ["meta", "flows"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["featureId", "version"],
+      "properties": {
+        "featureId": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "feature": {
+      "type": "string"
+    },
+
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["happy-path", "validation", "negative"]
+          }
+        }
+      }
+    },
+
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "preconditions", "steps", "variants"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^FLOW-[0-9]{3}$" },
+          "name": { "type": "string" },
+          "preconditions": { "type": "array", "items": { "type": "string" } },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["actor", "action", "expected"],
+              "properties": {
+                "actor": { "type": "string", "enum": ["user", "system"] },
+                "action": { "type": "string" },
+                "expected": { "type": "string" },
+                "apiCalls": { "type": "array", "items": { "type": "string" } },
+                "observability": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": false
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "name", "steps"],
+              "properties": {
+                "type": { "type": "string", "enum": ["alternate", "negative", "data"] },
+                "name": { "type": "string" },
+                "steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["actor", "action", "expected"],
+                    "properties": {
+                      "actor": { "type": "string", "enum": ["user", "system"] },
+                      "action": { "type": "string" },
+                      "expected": { "type": "string" },
+                      "apiCalls": { "type": "array", "items": { "type": "string" } }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

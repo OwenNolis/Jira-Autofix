@@ -1,10 +1,13 @@
 name: Feature Validation (Copilot)
 
-# Triggered by PR comments starting with /validate-feature-
-# Two modes:
-#   /validate-feature-012            → validate changed files only (default)
-#   /validate-feature-012 --changed  → validate changed files only (explicit)
-#   /validate-feature-012 --full     → validate entire codebase
+# Triggered by PR comments:
+#   /validate-feature-012                          → changed files only, FA/TA from docs/
+#   /validate-feature-012 --full                   → full codebase, FA/TA from docs/
+#   /validate-feature-012 [fa.md](URL) [ta.md](URL)  → use attached files instead of docs/
+#
+# If FA and TA markdown files are attached to the comment, those are used.
+# Otherwise falls back to docs/functional-analysis/ and docs/technical-analysis/.
+# Uses Claude Sonnet via GitHub Models — no extra secrets needed.
 
 on:
   issue_comment:
@@ -20,7 +23,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
 
-    # Only run on PR comments that start with /validate-feature-
     if: |
       github.event.issue.pull_request != null &&
       startsWith(github.event.comment.body, '/validate-feature-')
@@ -33,22 +35,27 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Extract feature number/id from comment, e.g. /validate-feature-012
           FEATURE_NUM="$(echo "$COMMENT" | grep -oP '(?<=/validate-feature-)\S+' | sed 's/--.*$//' | tr -d ' ')"
-          echo "Detected feature token: $FEATURE_NUM"
+          echo "Feature token: $FEATURE_NUM"
 
-          # Detect mode
           if echo "$COMMENT" | grep -q '\-\-full'; then
             MODE="full"
           else
             MODE="changed"
           fi
 
+          # Extract up to 2 attachment URLs (FA = first, TA = second)
+          URLS=($(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' || true))
+          FA_URL="${URLS[0]:-}"
+          TA_URL="${URLS[1]:-}"
+
           echo "feature_num=$FEATURE_NUM" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE"               >> "$GITHUB_OUTPUT"
-          echo "Mode: $MODE"
+          echo "fa_url=$FA_URL"           >> "$GITHUB_OUTPUT"
+          echo "ta_url=$TA_URL"           >> "$GITHUB_OUTPUT"
+          echo "Mode: $MODE | FA URL: ${FA_URL:-none} | TA URL: ${TA_URL:-none}"
 
-      - name: Post "working on it" reaction
+      - name: Post reaction
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMENT_ID: ${{ github.event.comment.id }}
@@ -63,29 +70,62 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve FA and TA paths
+      - name: Resolve FA and TA
         id: docs
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+          FA_URL: ${{ steps.parse.outputs.fa_url }}
+          TA_URL: ${{ steps.parse.outputs.ta_url }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          FA_PATH="$(find docs/functional-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
-          TA_PATH="$(find docs/technical-analysis  -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+          mkdir -p /tmp/docs
 
-          if [ -z "$FA_PATH" ]; then
-            echo "::error::FA not found for feature-${FEATURE_NUM} in docs/functional-analysis/"
-            exit 1
+          # ── FA ─────────────────────────────────────────────────────────────────
+          if [ -n "$FA_URL" ]; then
+            echo "📥 Downloading FA from attachment..."
+            curl -sS -L \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "$FA_URL" \
+              -o /tmp/docs/fa.md
+            FA_PATH="/tmp/docs/fa.md"
+            echo "  ✅ FA downloaded ($(wc -l < /tmp/docs/fa.md) lines)"
+          else
+            FA_PATH="$(find docs/functional-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" 2>/dev/null | head -1 || true)"
+            if [ -z "$FA_PATH" ]; then
+              gh pr comment "$PR_NUMBER" --body "❌ **Feature Validation failed** — FA not found.
+
+Attach the FA \`.md\` file to the comment, or make sure \`docs/functional-analysis/feature-${FEATURE_NUM}*.md\` exists." || true
+              exit 1
+            fi
+            echo "  ✅ FA from repo: $FA_PATH"
           fi
-          if [ -z "$TA_PATH" ]; then
-            echo "::error::TA not found for feature-${FEATURE_NUM} in docs/technical-analysis/"
-            exit 1
+
+          # ── TA ─────────────────────────────────────────────────────────────────
+          if [ -n "$TA_URL" ]; then
+            echo "📥 Downloading TA from attachment..."
+            curl -sS -L \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "$TA_URL" \
+              -o /tmp/docs/ta.md
+            TA_PATH="/tmp/docs/ta.md"
+            echo "  ✅ TA downloaded ($(wc -l < /tmp/docs/ta.md) lines)"
+          else
+            TA_PATH="$(find docs/technical-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" 2>/dev/null | head -1 || true)"
+            if [ -z "$TA_PATH" ]; then
+              gh pr comment "$PR_NUMBER" --body "❌ **Feature Validation failed** — TA not found.
+
+Attach the TA \`.md\` file to the comment, or make sure \`docs/technical-analysis/feature-${FEATURE_NUM}*.md\` exists." || true
+              exit 1
+            fi
+            echo "  ✅ TA from repo: $TA_PATH"
           fi
 
           echo "fa_path=$FA_PATH" >> "$GITHUB_OUTPUT"
           echo "ta_path=$TA_PATH" >> "$GITHUB_OUTPUT"
-          echo "FA: $FA_PATH"
-          echo "TA: $TA_PATH"
 
       - name: Get PR changed files
         id: pr_files
@@ -105,80 +145,52 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          > /tmp/code_context.txt
+          DIFF_CONTENT=""
           while IFS= read -r file; do
             if [ -f "$file" ]; then
               EXT="${file##*.}"
               case "$EXT" in
                 java|ts|tsx|js|jsx|sql|yaml|yml|json|xml|properties)
-                  printf '\n\n### File: %s\n```\n' "$file" >> /tmp/code_context.txt
-                  head -200 "$file"                         >> /tmp/code_context.txt
-                  printf '\n```\n'                          >> /tmp/code_context.txt
+                  DIFF_CONTENT="${DIFF_CONTENT}\n\n### File: ${file}\n\`\`\`\n$(head -200 "$file")\n\`\`\`"
                   ;;
               esac
             fi
           done <<< "$CHANGED_FILES"
 
           if [ "$MODE" = "full" ]; then
-            # Scan all known source directories for this feature's project
-            # Detect frontend/backend roots from changed files, then add known sibling dirs
-            PROJECT_DIR="$(echo "$CHANGED_FILES" | grep '/' | sed 's|/.*||' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')"
-            FEATURE_PREFIX="$(echo "$PROJECT_DIR" | sed 's|-frontend||;s|-backend||')"
-
-            # Build list of directories to scan (frontend + backend if they exist)
-            SCAN_DIRS=""
-            for dir in "${FEATURE_PREFIX}-frontend" "${FEATURE_PREFIX}-backend" "$PROJECT_DIR"; do
-              [ -d "$dir" ] && SCAN_DIRS="$SCAN_DIRS $dir"
-            done
-            SCAN_DIRS="${SCAN_DIRS:-${PROJECT_DIR:-.}}"
-            echo "Full scan dirs:$SCAN_DIRS"
-
-            for SCAN_ROOT in $SCAN_DIRS; do
-              find "$SCAN_ROOT" -path '*/node_modules' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
-                printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
-                head -150 "$f"                            >> /tmp/code_context.txt
-                printf '\n```\n'                          >> /tmp/code_context.txt
-              done || true
-              find "$SCAN_ROOT" -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
-                printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
-                head -150 "$f"                                  >> /tmp/code_context.txt
-                printf '\n```\n'                                >> /tmp/code_context.txt
-              done || true
-            done
+            while IFS= read -r f; do
+              DIFF_CONTENT="${DIFF_CONTENT}\n\n### File: ${f}\n\`\`\`java\n$(head -150 "$f")\n\`\`\`"
+            done < <(find backend/src/main -name "*.java" 2>/dev/null)
+            while IFS= read -r f; do
+              DIFF_CONTENT="${DIFF_CONTENT}\n\n### File: ${f}\n\`\`\`typescript\n$(head -150 "$f")\n\`\`\`"
+            done < <(find frontend/src \( -name "*.tsx" -o -name "*.ts" \) 2>/dev/null)
           fi
+
+          printf "%b" "$DIFF_CONTENT" > /tmp/code_context.txt
 
           echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CHANGED_FILES"     >> "$GITHUB_OUTPUT"
           echo "EOF"                >> "$GITHUB_OUTPUT"
 
-      - name: Run Copilot feature validation
+      - name: Run Claude feature validation
         id: validation
         env:
-          GH_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_MODEL: ${{ vars.COPILOT_VALIDATION_MODEL }}
-          FA_PATH:     ${{ steps.docs.outputs.fa_path }}
-          TA_PATH:     ${{ steps.docs.outputs.ta_path }}
-          MODE:        ${{ steps.parse.outputs.mode }}
-          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
-          PR_NUMBER:   ${{ github.event.issue.number }}
-          REPO:        ${{ github.repository }}
+          GH_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_MODEL:  ${{ vars.CLAUDE_MODEL }}
+          FA_PATH:       ${{ steps.docs.outputs.fa_path }}
+          TA_PATH:       ${{ steps.docs.outputs.ta_path }}
+          MODE:          ${{ steps.parse.outputs.mode }}
+          FEATURE_NUM:   ${{ steps.parse.outputs.feature_num }}
+          PR_NUMBER:     ${{ github.event.issue.number }}
+          REPO:          ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          MODEL="${COPILOT_MODEL:-gpt-4o}"
+          MODEL="${CLAUDE_MODEL:-claude-sonnet-4-5}"
 
-          # --full mode gets more code context at the cost of smaller FA/TA excerpts
-          # --changed mode keeps larger FA/TA since code context is small anyway
-          # All values chosen to keep total request under ~28KB (empirical API limit)
-          if [ "$MODE" = "full" ]; then
-            FA_CONTENT="$(head -c 4000 "$FA_PATH")"
-            TA_CONTENT="$(head -c 4000 "$TA_PATH")"
-            CODE_CONTEXT="$(head -c 16000 /tmp/code_context.txt)"
-          else
-            FA_CONTENT="$(head -c 8000 "$FA_PATH")"
-            TA_CONTENT="$(head -c 8000 "$TA_PATH")"
-            CODE_CONTEXT="$(head -c 8000 /tmp/code_context.txt)"
-          fi
+          FA_CONTENT="$(cat "$FA_PATH")"
+          TA_CONTENT="$(cat "$TA_PATH")"
+          CODE_CONTEXT="$(head -c 80000 /tmp/code_context.txt)"
 
           PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
           PR_BODY="$(gh api  "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' || true)"
@@ -186,20 +198,14 @@ jobs:
           MODE_LABEL="changed files only"
           [ "$MODE" = "full" ] && MODE_LABEL="full codebase"
 
-          if [ "$MODE" = "full" ]; then
-            TASK_DESCRIPTION="Your task: validate whether the CODEBASE already implements the feature described in the FA and TA. The code context below is a scan of the full codebase — judge what is implemented there, regardless of what the PR itself changed."
-          else
-            TASK_DESCRIPTION="Your task: validate whether the PR code correctly implements the feature described in the FA and TA. Only judge based on the changed files in the PR."
-          fi
-
           PROMPT="You are an expert software engineer doing a feature compliance review.
 
           You are given:
           1. A Functional Analysis (FA) document describing the feature requirements
           2. A Technical Analysis (TA) document describing the technical design
-          3. Code context (${MODE_LABEL})
+          3. Code context from the PR (${MODE_LABEL})
 
-          ${TASK_DESCRIPTION}
+          Your task: validate whether the PR code correctly implements the feature described in the FA and TA.
 
           ═══════════════════════════════════════
           FUNCTIONAL ANALYSIS (FA)
@@ -275,7 +281,6 @@ jobs:
           - Do NOT invent requirements — only validate against what is written in FA and TA
           - Keep each bullet concise (1 line max)"
 
-          # GitHub Models uses the OpenAI-compatible chat completions format
           REQUEST_JSON="$(jq -n --arg model "$MODEL" --arg prompt "$PROMPT" '{
             model: $model,
             messages: [{ role: "user", content: $prompt }],
@@ -283,9 +288,7 @@ jobs:
             max_tokens: 8192
           }')"
 
-          echo "Request JSON size: $(printf '%s' "$REQUEST_JSON" | wc -c) bytes"
-
-          HTTP_CODE="$(curl -sS -o /tmp/copilot.json -w "%{http_code}" \
+          HTTP_CODE="$(curl -sS -o /tmp/claude.json -w "%{http_code}" \
             -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -293,17 +296,16 @@ jobs:
             -d "$REQUEST_JSON" || true)"
 
           echo "GitHub Models HTTP status: $HTTP_CODE"
-          cat /tmp/copilot.json
 
           if [ "$HTTP_CODE" = "200" ]; then
-            REPORT="$(jq -r '.choices[0].message.content // ""' /tmp/copilot.json)"
+            REPORT="$(jq -r '.choices[0].message.content // ""' /tmp/claude.json)"
           else
-            REPORT="⚠️ GitHub Models API call failed (HTTP $HTTP_CODE). Please retry the validation command."
+            ERROR="$(jq -r '.error.message // "unknown error"' /tmp/claude.json 2>/dev/null || true)"
+            REPORT="⚠️ GitHub Models API call failed (HTTP $HTTP_CODE): ${ERROR}. Please retry the validation command."
           fi
 
-          # Write the final PR comment
           {
-            echo "## 🔍 Feature Validation (Copilot) — \`feature-${FEATURE_NUM}\`"
+            echo "## 🔍 Feature Validation — \`feature-${FEATURE_NUM}\`"
             echo
             echo "> **Mode:** ${MODE_LABEL} | **Model:** ${MODEL}"
             echo
@@ -314,16 +316,3 @@ jobs:
           } > /tmp/validation-report.md
 
           gh pr comment "$PR_NUMBER" --body-file /tmp/validation-report.md
-
-      - name: Handle docs not found
-        if: failure() && steps.docs.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.issue.number }}
-          FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
-        run: |
-          gh pr comment "$PR_NUMBER" --body "❌ **Feature Validation (Copilot) failed** — could not find FA or TA documents for \`feature-${FEATURE_NUM}\`.
-
-          Make sure these files exist:
-          - \`docs/functional-analysis/feature-${FEATURE_NUM}*.md\`
-          - \`docs/technical-analysis/feature-${FEATURE_NUM}*.md\`" || true

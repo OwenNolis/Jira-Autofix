@@ -1,0 +1,172 @@
+name: AI — PDF to FA
+
+# Triggered by PR comments:
+#   /pdf-to-fa feature-012-my-feature
+#   [document.pdf](https://github.com/user-attachments/assets/...)
+#
+# The PDF must be drag-dropped into the comment. GitHub inserts a markdown
+# link automatically. The workflow downloads it, runs pdf_to_fa.py via
+# Claude Sonnet on GitHub Models, and posts the FA as a PR comment.
+# A zip artifact (md + images) is also uploaded for download.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  models: read
+
+jobs:
+  pdf-to-fa:
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/pdf-to-fa ')
+
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+
+          FEATURE_ID="$(echo "$COMMENT" | grep -oP '(?<=/pdf-to-fa )\S+' | head -1)"
+          echo "Feature ID: $FEATURE_ID"
+
+          PDF_URL="$(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' | head -1 || true)"
+          if [ -z "$PDF_URL" ]; then
+            # Also try githubusercontent.com attachment format
+            PDF_URL="$(echo "$COMMENT" | grep -oP 'https://[^\s\)]+\.pdf' | head -1 || true)"
+          fi
+          echo "PDF URL: $PDF_URL"
+
+          echo "feature_id=$FEATURE_ID" >> "$GITHUB_OUTPUT"
+          echo "pdf_url=$PDF_URL"       >> "$GITHUB_OUTPUT"
+
+      - name: Post reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST \
+            "/repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content='+1' || true
+
+      - name: Validate inputs
+        env:
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+          PDF_URL: ${{ steps.parse.outputs.pdf_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$FEATURE_ID" ]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **PDF to FA failed** — could not parse feature ID from command.
+          Expected: \`/pdf-to-fa feature-012-my-feature\`" || true
+            exit 1
+          fi
+          if [ -z "$PDF_URL" ]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **PDF to FA failed** — no PDF attachment found in comment.
+          Please drag-drop a PDF file into your comment alongside the command." || true
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Install Python dependencies
+        run: |
+          pip install --quiet \
+            langchain-openai langchain-core langgraph \
+            pymupdf pillow python-dotenv pypdf jsonschema
+
+      - name: Download PDF
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PDF_URL: ${{ steps.parse.outputs.pdf_url }}
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+        run: |
+          mkdir -p /tmp/pdf-input
+          curl -sS -L \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$PDF_URL" \
+            -o "/tmp/pdf-input/${FEATURE_ID}.pdf"
+          echo "Downloaded PDF: $(ls -lh /tmp/pdf-input/)"
+
+      - name: Run PDF to FA conversion
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+        run: |
+          mkdir -p /tmp/fa-output
+          python ai/agent/langgraph/pdf_to_fa.py \
+            "/tmp/pdf-input/${FEATURE_ID}.pdf" \
+            "$FEATURE_ID" \
+            --output-dir /tmp/fa-output \
+            --lang nl
+
+      - name: Post FA as PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          FA_FILE="/tmp/fa-output/${FEATURE_ID}.md"
+
+          if [ ! -f "$FA_FILE" ]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **PDF to FA failed** — output file not found." || true
+            exit 1
+          fi
+
+          FA_CONTENT="$(cat "$FA_FILE")"
+          CHAR_COUNT="${#FA_CONTENT}"
+          TRUNCATED=""
+
+          # GitHub comment limit is ~65536 chars; leave room for header/footer
+          if [ "$CHAR_COUNT" -gt 60000 ]; then
+            FA_CONTENT="$(echo "$FA_CONTENT" | head -c 60000)"
+            TRUNCATED="⚠️ _Content truncated at 60 000 characters. Download the full file from the artifact below._"
+          fi
+
+          {
+            echo "## 📄 Generated FA — \`${FEATURE_ID}\`"
+            echo
+            echo "> Download the full file (with images) from the **Actions artifact** on this run."
+            echo "> Re-drop the \`.md\` file in a new comment to run \`/fa-to-ta\`."
+            echo
+            echo "---"
+            echo
+            echo "$FA_CONTENT"
+            echo
+            if [ -n "$TRUNCATED" ]; then echo "$TRUNCATED"; fi
+            echo
+            echo "---"
+            echo "_Generated by @${{ github.event.comment.user.login }} · $(date -u '+%Y-%m-%d %H:%M UTC')_"
+          } > /tmp/fa-comment.md
+
+          gh pr comment "$PR_NUMBER" --body-file /tmp/fa-comment.md
+
+      - name: Upload FA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fa-${{ steps.parse.outputs.feature_id }}
+          path: /tmp/fa-output/
+          retention-days: 30
