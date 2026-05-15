@@ -244,13 +244,14 @@ def classify_fa(state: TAState) -> dict:
         print(f"🏷️  FA-type (manual): {fa_type}")
     else:
         print("🔎 Detecting FA type...")
+        fa_snippet = state["fa_content_text"][:6000]
         prompt = f"""Je bent een SDLC-classificatie agent.
 
 Lees de onderstaande Functionele Analyse en bepaal het type feature.
 
 FA inhoud:
 ---
-{state["fa_content_text"]}
+{fa_snippet}
 ---
 
 Kies EXACT één van de volgende types:
@@ -1300,21 +1301,21 @@ def _clean_messaging(raw: dict) -> dict:
 def compact_fa_content(fa_content: str) -> str:
     """Strip verbose image-description blocks, keeping only the **[Afbeelding: X]** label.
 
-    expand_fa_images writes blocks of the form:
+    expand_fa_images wraps each description in HTML comments:
         <!-- Afbeelding: name -->
         **[Afbeelding: name]**
 
         [multi-paragraph description]
+        <!-- /Afbeelding -->
 
-    This function collapses each block to just the label line so the content
-    fits within token limits for classification and parsing steps.
+    This function removes everything between the label and the closing marker
+    so the content fits within token limits for classification and parsing.
     """
     import re as _re
     return _re.sub(
-        r'<!-- Afbeelding:[^\n]*\n'       # comment line
-        r'(\*\*\[Afbeelding:[^\]]*\]\*\*)'  # capture label line
-        r'\n\n.*?'                        # blank line + description (non-greedy)
-        r'(?=\n<!-- Afbeelding:|\n##|\Z)',  # until next block, heading, or end
+        r'<!-- Afbeelding:[^\n]*\n'          # opening comment line
+        r'(\*\*\[Afbeelding:[^\]]*\]\*\*)\n' # capture label line
+        r'\n.*?<!-- /Afbeelding -->\n?',      # description + closing marker
         r'\1\n',
         fa_content,
         flags=_re.DOTALL,
@@ -1342,6 +1343,7 @@ def expand_fa_images(fa_text: str, fa_path: Path) -> str:
                 f"<!-- Afbeelding: {label} -->\n"
                 f"**[Afbeelding: {label}]**\n\n"
                 f"{description}\n"
+                f"<!-- /Afbeelding -->\n"
             )
 
         img_path = (fa_dir / img_src).resolve()
@@ -1360,6 +1362,7 @@ def expand_fa_images(fa_text: str, fa_path: Path) -> str:
             f"<!-- Afbeelding: {label} -->\n"
             f"**[Afbeelding: {label}]**\n\n"
             f"{description}\n"
+            f"<!-- /Afbeelding -->\n"
         )
 
     return pattern.sub(_replace, fa_text)
