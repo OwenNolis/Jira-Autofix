@@ -17,7 +17,7 @@ env:
   COPILOT_MODEL: claude-sonnet-4-6   # Change this to switch the AI model (e.g. gpt-4.1, claude-sonnet-4-6)
 
 concurrency:
-  group: ai-fix-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  group: ai-fix-issue-enterprise-${{ github.event.inputs.issue_number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
@@ -79,7 +79,7 @@ jobs:
             ISSUE_NUMBER="${{ github.event.issue.number }}"
           fi
 
-          # Fetch full issue details (single API call — replaces separate resolve step)
+          # Fetch full issue details
           ISSUE_JSON=$(curl -s \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
