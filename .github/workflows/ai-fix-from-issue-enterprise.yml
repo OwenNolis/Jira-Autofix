@@ -248,7 +248,7 @@ jobs:
           # Cap output at 5MB to guard against runaway responses
           # || true suppresses the SIGPIPE error (exit 141) that head -c sends back
           # to the copilot process when the limit is reached
-          copilot -p "$(cat copilot-prompt.txt)" \
+          copilot -p @copilot-prompt.txt \
             --model "$COPILOT_MODEL" \
             --no-ask-user \
             2>&1 | head -c 5242880 | tee /tmp/copilot-output.log || true
