@@ -45,7 +45,7 @@ jobs:
           fi
 
           # Extract up to 2 attachment URLs (FA = first, TA = second)
-          URLS=($(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/assets/[^\s\)]+' || true))
+          URLS=($(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/(?:assets|files)/[^\s\)]+' || true))
           FA_URL="${URLS[0]:-}"
           TA_URL="${URLS[1]:-}"
 
