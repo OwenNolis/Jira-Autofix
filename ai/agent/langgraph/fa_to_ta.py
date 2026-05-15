@@ -1273,7 +1273,8 @@ def expand_fa_images(fa_text: str, fa_path: Path) -> str:
 
         img_path = (fa_dir / img_src).resolve()
         if not img_path.is_file():
-            return match.group(0)
+            label = alt_text if alt_text else img_src
+            return f"**[Afbeelding: {label}]**"
 
         if img_path.suffix.lower() not in IMAGE_EXTENSIONS:
             return match.group(0)
