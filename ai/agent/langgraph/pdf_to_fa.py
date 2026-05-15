@@ -142,7 +142,7 @@ def get_llm() -> ChatOpenAI:
         base_url="https://models.inference.ai.azure.com",
         api_key=api_key,
         temperature=0,
-        max_tokens=8192,
+        max_tokens=4096,
     )
 
 
@@ -522,7 +522,7 @@ def main():
     print(f"Output : {output_path}")
     print(f"Images : {img_dir}/")
     print(f"Render : {_RENDER_BACKEND or 'none (no rendering available)'}")
-    print(f"Model  : {os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-5')}")
+    print(f"Model  : {os.environ.get('CLAUDE_MODEL', 'gpt-4o')}")
     print("==============================================\n")
 
     pdf_bytes = pdf_path.read_bytes()
