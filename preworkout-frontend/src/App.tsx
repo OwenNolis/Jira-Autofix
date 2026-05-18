@@ -7,9 +7,7 @@ import OrdersPage from './pages/OrdersPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
-import AuthPage from './pages/AuthPage';
 import Navbar from './components/Navbar';
-import CartDrawer from './components/CartDrawer';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import Footer from './components/Footer';
@@ -21,7 +19,6 @@ const App: React.FC = () => {
       <CartProvider>
         <Router>
           <Navbar />
-          <CartDrawer />
           <div style={{ paddingBottom: '64px' }}>
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -31,7 +28,6 @@ const App: React.FC = () => {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/admin" element={<AdminPage />} />
-              <Route path="/auth" element={<AuthPage />} />
             </Routes>
           </div>
           <Footer />
