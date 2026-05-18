@@ -112,6 +112,56 @@
   color: var(--color-text);
   min-height: 100vh;
   transition: background 0.2s, color 0.2s;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* --- Footer Styles --- */
+.app-footer {
+  background: var(--color-card-bg);
+  color: #888;
+  border-top: 1px solid var(--color-dropdown-border);
+  padding: 18px 0 12px 0;
+  text-align: center;
+  margin-top: auto;
+  font-size: 1rem;
+  width: 100%;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.03);
+}
+.footer-content {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.footer-links {
+  display: flex;
+  gap: 14px;
+}
+.footer-links a {
+  color: var(--color-nav);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.footer-links a:hover {
+  color: var(--color-nav-link-hover);
+}
+@media (max-width: 600px) {
+  .app-footer {
+    font-size: 0.95rem;
+    padding: 10px 0 8px 0;
+  }
+  .footer-content {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .footer-links {
+    gap: 8px;
+  }
 }
 
 /* --- Clock Widget Styles --- */
@@ -658,7 +708,7 @@ body.dark ::-webkit-scrollbar-thumb, .App.dark ::-webkit-scrollbar-thumb {
 .dashboard-table-wrapper {
   overflow-x: auto;
 }
-.dashboard-table {
+dashboard-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 8px;

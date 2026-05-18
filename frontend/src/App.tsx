@@ -10,6 +10,21 @@ import IssuesPage from './components/IssuesPage';
 import Settings from './components/Settings';
 import Notifications from './components/Notifications';
 
+// --- Footer Component ---
+function Footer() {
+  return (
+    <footer className="app-footer">
+      <div className="footer-content">
+        <span>© {new Date().getFullYear()} Jira Autofix</span>
+        <span className="footer-links">
+          <a href="https://github.com/OwenNolis/Jira-Autofix" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://agentic-ai-sdlc.atlassian.net/browse/JIRAFIX-62" target="_blank" rel="noopener noreferrer">Jira</a>
+        </span>
+      </div>
+    </footer>
+  );
+}
+
 // --- Toast Notification System ---
 interface Toast {
   id: number;
@@ -374,6 +389,7 @@ function AppContent() {
           }
         />
       </Routes>
+      <Footer />
     </div>
   );
 }
