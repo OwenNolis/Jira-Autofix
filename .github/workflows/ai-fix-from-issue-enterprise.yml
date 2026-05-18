@@ -14,7 +14,7 @@ on:
         required: true
 
 env:
-  COPILOT_MODEL: gpt-4o   # Change this to switch the AI model (e.g. gpt-4.1, claude-sonnet-4-6)
+  COPILOT_MODEL: gpt-4.1   # Change this to switch the AI model (e.g. gpt-4o, claude-sonnet-4-6)
 
 concurrency:
   group: ai-fix-issue-enterprise-${{ github.event.inputs.issue_number || github.event.issue.number }}
