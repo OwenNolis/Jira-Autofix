@@ -16,7 +16,7 @@ on:
     types: [created]
 
 env:
-  COPILOT_MODEL: claude-sonnet-4-6
+  COPILOT_MODEL: gpt-4o
 
 permissions:
   contents: read
