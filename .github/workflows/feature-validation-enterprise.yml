@@ -331,7 +331,6 @@ jobs:
           # Run Copilot CLI and capture output
           # Use @file syntax to avoid passing large content as a command argument (ARG_MAX limit)
           copilot -p @copilot-prompt.txt \
-            --model "$COPILOT_MODEL" \
             --no-ask-user \
             2>&1 | head -c 5242880 | tee /tmp/validation-output.log || true
 
@@ -349,7 +348,7 @@ jobs:
           {
             echo "## 🔍 Feature Validation (Enterprise) — \`feature-${FEATURE_NUM}\`"
             echo
-            echo "> **Mode:** ${MODE_LABEL} | **Model:** ${COPILOT_MODEL}"
+            echo "> **Mode:** ${MODE_LABEL} | **Model:** Copilot default"
             echo
             echo "$REPORT"
             echo
