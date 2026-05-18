@@ -5,6 +5,11 @@ name: Feature Validation (Enterprise)
 #   /validate-feature-012            → validate changed files only (default)
 #   /validate-feature-012 --changed  → validate changed files only (explicit)
 #   /validate-feature-012 --full     → validate entire codebase
+#
+# Optionally attach FA and TA files (FA first, TA second):
+#   /validate-feature-012
+#   [fa.md](https://github.com/user-attachments/...)
+#   [ta.md](https://github.com/user-attachments/...)
 
 on:
   issue_comment:
@@ -47,9 +52,16 @@ jobs:
             MODE="changed"
           fi
 
+          # Extract up to 2 attachment URLs (FA = first, TA = second)
+          URLS=($(echo "$COMMENT" | grep -oP 'https://github\.com/user-attachments/(?:assets|files)/[^\s\)]+' || true))
+          FA_URL="${URLS[0]:-}"
+          TA_URL="${URLS[1]:-}"
+
           echo "feature_num=$FEATURE_NUM" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE"               >> "$GITHUB_OUTPUT"
-          echo "Mode: $MODE"
+          echo "fa_url=$FA_URL"           >> "$GITHUB_OUTPUT"
+          echo "ta_url=$TA_URL"           >> "$GITHUB_OUTPUT"
+          echo "Mode: $MODE | FA URL: ${FA_URL:-none} | TA URL: ${TA_URL:-none}"
 
       - name: Post "working on it" reaction
         env:
@@ -69,26 +81,55 @@ jobs:
       - name: Resolve FA and TA paths
         id: docs
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FEATURE_NUM: ${{ steps.parse.outputs.feature_num }}
+          FA_URL: ${{ steps.parse.outputs.fa_url }}
+          TA_URL: ${{ steps.parse.outputs.ta_url }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          FA_PATH="$(find docs/functional-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
-          TA_PATH="$(find docs/technical-analysis  -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+          mkdir -p /tmp/docs
 
-          if [ -z "$FA_PATH" ]; then
-            echo "::error::FA not found for feature-${FEATURE_NUM} in docs/functional-analysis/"
-            exit 1
+          # ── FA ──────────────────────────────────────────────────────────────────
+          if [ -n "$FA_URL" ]; then
+            echo "📥 Downloading FA from attachment..."
+            curl -sS -L \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "$FA_URL" \
+              -o /tmp/docs/fa.md
+            FA_PATH="/tmp/docs/fa.md"
+            echo "  ✅ FA downloaded ($(wc -l < /tmp/docs/fa.md) lines)"
+          else
+            FA_PATH="$(find docs/functional-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+            if [ -z "$FA_PATH" ]; then
+              gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **Feature Validation failed** — FA not found. Attach the FA \`.md\` file to the comment, or make sure \`docs/functional-analysis/feature-${FEATURE_NUM}*.md\` exists." || true
+              exit 1
+            fi
+            echo "  ✅ FA from repo: $FA_PATH"
           fi
-          if [ -z "$TA_PATH" ]; then
-            echo "::error::TA not found for feature-${FEATURE_NUM} in docs/technical-analysis/"
-            exit 1
+
+          # ── TA ──────────────────────────────────────────────────────────────────
+          if [ -n "$TA_URL" ]; then
+            echo "📥 Downloading TA from attachment..."
+            curl -sS -L \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "$TA_URL" \
+              -o /tmp/docs/ta.md
+            TA_PATH="/tmp/docs/ta.md"
+            echo "  ✅ TA downloaded ($(wc -l < /tmp/docs/ta.md) lines)"
+          else
+            TA_PATH="$(find docs/technical-analysis -maxdepth 1 -name "feature-${FEATURE_NUM}*.md" | head -1 || true)"
+            if [ -z "$TA_PATH" ]; then
+              gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **Feature Validation failed** — TA not found. Attach the TA \`.md\` file to the comment, or make sure \`docs/technical-analysis/feature-${FEATURE_NUM}*.md\` exists." || true
+              exit 1
+            fi
+            echo "  ✅ TA from repo: $TA_PATH"
           fi
 
           echo "fa_path=$FA_PATH" >> "$GITHUB_OUTPUT"
           echo "ta_path=$TA_PATH" >> "$GITHUB_OUTPUT"
-          echo "FA: $FA_PATH"
-          echo "TA: $TA_PATH"
 
       - name: Get PR changed files
         id: pr_files
