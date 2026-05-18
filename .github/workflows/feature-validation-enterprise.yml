@@ -328,11 +328,9 @@ jobs:
             echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — approaching context limit"
           fi
 
-          # Run Copilot CLI and capture output.
-          # Pass the task inline so the model treats it as an instruction (not context),
-          # then reference the large prompt file for the actual content.
-          TASK="Execute the feature validation task in @copilot-prompt.txt. Output ONLY the structured markdown report starting with '## 📋 FA Validation'. Do not greet, do not ask questions."
-          copilot -p "$TASK" \
+          # Pass the full prompt inline so Copilot CLI treats it as a user task message,
+          # not as repository context. This prevents the model from misinterpreting what to validate.
+          copilot -p "$(cat copilot-prompt.txt)" \
             --no-ask-user \
             2>&1 | head -c 5242880 | tee /tmp/validation-output.log || true
 
