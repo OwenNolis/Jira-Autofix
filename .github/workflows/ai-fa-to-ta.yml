@@ -130,7 +130,9 @@ jobs:
             exit 1
           fi
 
-          TA_CONTENT="$(cat "$TA_FILE")"
+          # Strip embedded base64 images — GitHub PR comments can't render data URIs.
+          # The full file with images is available in the artifact.
+          TA_CONTENT="$(sed 's|!\[[^]]*\](data:image[^)]*)|[image - see artifact]|g' "$TA_FILE")"
           CHAR_COUNT="${#TA_CONTENT}"
           TRUNCATED=""
 

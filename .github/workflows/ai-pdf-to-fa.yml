@@ -136,7 +136,9 @@ jobs:
             exit 1
           fi
 
-          FA_CONTENT="$(cat "$FA_FILE")"
+          # Strip embedded base64 images — GitHub PR comments can't render data URIs.
+          # The full file with images is available in the artifact.
+          FA_CONTENT="$(sed 's|!\[[^]]*\](data:image[^)]*)|[image - see artifact]|g' "$FA_FILE")"
           CHAR_COUNT="${#FA_CONTENT}"
           TRUNCATED=""
 
