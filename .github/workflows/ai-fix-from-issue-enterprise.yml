@@ -119,12 +119,17 @@ jobs:
               ;;
           esac
 
-          # Find real example file paths from the repo for the prompt
+          # Full file tree — model uses this to understand structure and locate files
+          FILE_TREE=$(git ls-files | grep -v node_modules | sort)
+
+          # Example paths for the output format
           EXAMPLE_TS=$(git ls-files | grep -E '\.(tsx|ts)$' | grep -v node_modules | head -1 || echo "src/index.ts")
           EXAMPLE_CSS=$(git ls-files | grep -E '\.css$' | grep -v node_modules | head -1 || echo "src/index.css")
 
           {
-            echo "You are an expert software engineer. Fix the GitHub issue below by writing the minimal code changes needed."
+            echo "IMPORTANT: Do NOT greet, do NOT ask questions, do NOT explain. Output ONLY a raw JSON object as described at the bottom of this prompt. Start your response with '{' and end with '}'."
+            echo ""
+            echo "You are an expert software engineer. Implement the fix for the GitHub issue below."
             echo ""
             echo "Repository: ${{ github.repository }}"
             echo "Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
@@ -133,8 +138,9 @@ jobs:
             echo "## Issue Description"
             echo "${ISSUE_BODY}"
             echo ""
-            echo "The repository is checked out in the current working directory."
-            echo "Read any files you need to understand the codebase before writing code."
+            echo "## Complete Repository File Tree"
+            echo "Use this to understand the project structure, infer naming conventions, locate relevant files, and write correct import paths."
+            printf '```\n%s\n```\n' "${FILE_TREE}"
             echo ""
             echo "## Step 1 — Analyse (think before you code)"
             echo "Before writing any code, reason through the following:"
@@ -170,7 +176,8 @@ jobs:
             echo "  for this project (find the correct index.html by reading the repository)."
             echo ""
             echo "## REQUIRED OUTPUT FORMAT"
-            echo "Respond with ONLY a JSON object — no explanation, no markdown fences around the JSON itself:"
+            echo "Output ONLY a raw JSON object — no greeting, no explanation, no markdown fences."
+            echo "Start your response with '{' and end with '}'. Nothing before or after."
             echo ""
             echo "{\"type\": \"fix\", \"analysis\": \"brief explanation of what changed and why\", \"files\": [{\"path\": \"${EXAMPLE_TS}\", \"content\": \"// full file content here\"}, {\"path\": \"${EXAMPLE_CSS}\", \"content\": \"/* full file content */\"}]}"
             echo ""
@@ -184,7 +191,7 @@ jobs:
             echo "    chore    — config, tooling, or dependency updates"
             echo "    docs     — documentation only"
             echo "    test     — adding or updating tests"
-            echo "- 'path': relative path from repo root (e.g. src/App.tsx)"
+            echo "- 'path': relative path from repo root matching a file from the tree above (or new file path)"
             echo "- 'content': the COMPLETE updated file — not a diff, not a snippet, the whole file"
             echo "- Only include files you actually changed"
             echo "- Output nothing before or after the JSON object"
