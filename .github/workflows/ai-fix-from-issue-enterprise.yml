@@ -119,31 +119,6 @@ jobs:
               ;;
           esac
 
-          # Build repository file tree
-          FILE_TREE=$(git ls-files \
-            | grep -E '\.(ts|tsx|js|jsx|css|scss|html|json)$' \
-            | sort)
-          
-          # Embed COMPLETE source file contents + package.json so AI knows
-          # exactly what packages are installed and can add new ones if needed
-          true > /tmp/file_contents.txt
-
-          # package.json first — model must know available packages
-          git ls-files | grep 'package\.json' | grep -v node_modules | while IFS= read -r f; do
-            [ -f "$f" ] || continue
-            { printf '### FILE: %s\n```\n' "$f"; cat "$f"; printf '\n```\n\n'; } >> /tmp/file_contents.txt
-          done
-
-          # Up to 80 source files, most recently committed first
-          git log --name-only --format="" \
-            | grep -E '\.(ts|tsx|js|jsx|css|scss)$' \
-            | awk '!seen[$0]++' \
-            | head -80 \
-            | while IFS= read -r f; do
-              [ -f "$f" ] || continue
-              { printf '### FILE: %s\n```\n' "$f"; cat "$f"; printf '\n```\n\n'; } >> /tmp/file_contents.txt
-            done
-
           # Find real example file paths from the repo for the prompt
           EXAMPLE_TS=$(git ls-files | grep -E '\.(tsx|ts)$' | grep -v node_modules | head -1 || echo "src/index.ts")
           EXAMPLE_CSS=$(git ls-files | grep -E '\.css$' | grep -v node_modules | head -1 || echo "src/index.css")
@@ -158,11 +133,8 @@ jobs:
             echo "## Issue Description"
             echo "${ISSUE_BODY}"
             echo ""
-            echo "## Repository File Tree"
-            printf '```\n%s\n```\n' "${FILE_TREE}"
-            echo ""
-            echo "## Current Source Files (COMPLETE contents)"
-            cat /tmp/file_contents.txt
+            echo "The repository is checked out in the current working directory."
+            echo "Read any files you need to understand the codebase before writing code."
             echo ""
             echo "## Step 1 — Analyse (think before you code)"
             echo "Before writing any code, reason through the following:"
@@ -195,7 +167,7 @@ jobs:
             echo "- IMPORTANT: Never import a package that is not listed in package.json."
             echo "- IMPORTANT: When using third-party CSS that references local image files (e.g. leaflet),"
             echo "  do NOT import it via JS/TS. Instead add a CDN <link> tag to the HTML entry point"
-            echo "  for this project (check the file tree above to find the correct index.html path)."
+            echo "  for this project (find the correct index.html by reading the repository)."
             echo ""
             echo "## REQUIRED OUTPUT FORMAT"
             echo "Respond with ONLY a JSON object — no explanation, no markdown fences around the JSON itself:"
@@ -218,14 +190,7 @@ jobs:
             echo "- Output nothing before or after the JSON object"
           } > copilot-prompt.txt
           
-          PROMPT_BYTES=$(wc -c < copilot-prompt.txt)
-          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines, ${PROMPT_BYTES} bytes)"
-          if [ "$PROMPT_BYTES" -gt 800000 ]; then
-            echo "::error::Prompt exceeds 800KB (${PROMPT_BYTES} bytes) — too large for Claude Sonnet 4.6's 200K token context"
-            exit 1
-          elif [ "$PROMPT_BYTES" -gt 400000 ]; then
-            echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — approaching context limit, consider reducing included files"
-          fi
+          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines, $(wc -c < copilot-prompt.txt) bytes)"
 
       - name: Cache Copilot CLI
         uses: actions/cache@v4
