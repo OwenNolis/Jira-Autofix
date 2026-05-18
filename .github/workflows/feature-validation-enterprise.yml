@@ -339,7 +339,9 @@ jobs:
           if [ "$COPILOT_EXIT" -ne 0 ] && [ "$COPILOT_EXIT" -ne 141 ]; then
             REPORT="⚠️ Copilot CLI failed (exit ${COPILOT_EXIT}) — check COPILOT_PAT secret and CLI flags."
           else
-            REPORT="$(cat /tmp/validation-output.log)"
+            REPORT="$(awk '/^#/{found=1} found{print}' /tmp/validation-output.log)"
+            # Fallback: no markdown headings found, use full output
+            [ -z "$REPORT" ] && REPORT="$(cat /tmp/validation-output.log)"
           fi
 
           rm -f copilot-prompt.txt
