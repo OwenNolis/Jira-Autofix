@@ -196,22 +196,12 @@ jobs:
           echo "$CHANGED_FILES"     >> "$GITHUB_OUTPUT"
           echo "EOF"                >> "$GITHUB_OUTPUT"
 
-      - name: Cache Copilot CLI
-        uses: actions/cache@v4
-        id: cache-copilot
-        with:
-          path: ~/.local/bin
-          key: copilot-cli-${{ runner.os }}
-
-      - name: Install Copilot CLI
-        if: steps.cache-copilot.outputs.cache-hit != 'true'
-        run: curl -fsSL https://gh.io/copilot-install | bash
-
-      - name: Run Copilot feature validation
+      - name: Run feature validation via GitHub Models API
         id: validation
         env:
-          GH_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_MODEL:        ${{ env.COPILOT_MODEL }}
           FA_PATH:     ${{ steps.docs.outputs.fa_path }}
           TA_PATH:     ${{ steps.docs.outputs.ta_path }}
           MODE:        ${{ steps.parse.outputs.mode }}
@@ -219,7 +209,6 @@ jobs:
           PR_NUMBER:   ${{ github.event.issue.number }}
           REPO:        ${{ github.repository }}
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
           set -euo pipefail
 
           PR_TITLE="$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title' || true)"
@@ -321,27 +310,35 @@ jobs:
 
           PROMPT_BYTES=$(wc -c < copilot-prompt.txt)
           echo "Prompt size: ${PROMPT_BYTES} bytes"
-          if [ "$PROMPT_BYTES" -gt 800000 ]; then
-            echo "::error::Prompt exceeds 800KB (${PROMPT_BYTES} bytes) — too large for Claude Sonnet 4.6's 200K token context"
-            exit 1
-          elif [ "$PROMPT_BYTES" -gt 400000 ]; then
-            echo "::warning::Prompt is large (${PROMPT_BYTES} bytes) — approaching context limit"
-          fi
 
-          # Pass the full prompt inline so Copilot CLI treats it as a user task message,
-          # not as repository context. This prevents the model from misinterpreting what to validate.
-          copilot -p "$(cat copilot-prompt.txt)" \
-            --no-ask-user \
-            2>&1 | head -c 5242880 | tee /tmp/validation-output.log || true
+          MODEL="${COPILOT_MODEL:-gpt-4.1}"
 
-          COPILOT_EXIT=${PIPESTATUS[0]}
-          # 141 = 128+13 = SIGPIPE, expected when head -c truncates — not a real failure
-          if [ "$COPILOT_EXIT" -ne 0 ] && [ "$COPILOT_EXIT" -ne 141 ]; then
-            REPORT="⚠️ Copilot CLI failed (exit ${COPILOT_EXIT}) — check COPILOT_PAT secret and CLI flags."
+          # Build JSON request using --rawfile so file contents never touch shell arguments.
+          # This bypasses the ARG_MAX limit that breaks $(cat large-file) approaches.
+          jq -n \
+            --arg model "$MODEL" \
+            --rawfile prompt copilot-prompt.txt \
+            '{
+              model: $model,
+              messages: [{ role: "user", content: $prompt }],
+              temperature: 0,
+              max_tokens: 8192
+            }' > /tmp/request.json
+
+          HTTP_CODE="$(curl -sS -o /tmp/validation-response.json -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${COPILOT_GITHUB_TOKEN}" \
+            "https://models.inference.ai.azure.com/chat/completions" \
+            --data @/tmp/request.json || true)"
+
+          echo "GitHub Models HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            REPORT="$(jq -r '.choices[0].message.content // ""' /tmp/validation-response.json)"
           else
-            REPORT="$(awk '/^#/{found=1} found{print}' /tmp/validation-output.log)"
-            # Fallback: no markdown headings found, use full output
-            [ -z "$REPORT" ] && REPORT="$(cat /tmp/validation-output.log)"
+            ERROR="$(jq -r '.error.message // "unknown error"' /tmp/validation-response.json 2>/dev/null || true)"
+            REPORT="⚠️ GitHub Models API call failed (HTTP $HTTP_CODE): ${ERROR}. Please retry the validation command."
           fi
 
           rm -f copilot-prompt.txt
@@ -350,7 +347,7 @@ jobs:
           {
             echo "## 🔍 Feature Validation (Enterprise) — \`feature-${FEATURE_NUM}\`"
             echo
-            echo "> **Mode:** ${MODE_LABEL} | **Model:** Copilot default"
+            echo "> **Mode:** ${MODE_LABEL} | **Model:** ${MODEL}"
             echo
             echo "$REPORT"
             echo
