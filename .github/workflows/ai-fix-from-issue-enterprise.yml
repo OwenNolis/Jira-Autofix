@@ -240,13 +240,20 @@ jobs:
       - name: Apply AI-generated file changes
         id: apply_changes
         run: |
-          RAW=$(cat /tmp/copilot-output.log)
-          
-          # Attempt 1: whole output is valid JSON with a "files" key
-          if ! JSON=$(printf '%s' "$RAW" | jq -e 'select(has("files"))' 2>/dev/null); then
-            # Attempt 2: extract the outermost {...} block containing "files" using PCRE
-            EXTRACTED=$(printf '%s' "$RAW" | grep -oP '(?s)\{.*"files".*\}' | head -1 || true)
-            JSON=$(printf '%s' "$EXTRACTED" | jq -e 'select(has("files"))' 2>/dev/null || true)
+          # The Copilot CLI appends metadata lines (Changes/Requests/Tokens) after
+          # the model output, so we can't parse the full log as JSON directly.
+          # Use awk to find the first line starting with '{' and the last line
+          # that is '}', then extract that range and validate with jq.
+          START=$(awk '/^\{/{print NR; exit}' /tmp/copilot-output.log)
+          END=$(awk '/^\}/{line=NR} END{print line}' /tmp/copilot-output.log)
+          JSON=""
+          if [ -n "$START" ] && [ -n "$END" ] && [ "$END" -ge "$START" ]; then
+            JSON=$(sed -n "${START},${END}p" /tmp/copilot-output.log \
+              | jq -e 'select(has("files"))' 2>/dev/null || true)
+          fi
+          # Fallback: try the whole file as-is
+          if [ -z "$JSON" ]; then
+            JSON=$(jq -e 'select(has("files"))' /tmp/copilot-output.log 2>/dev/null || true)
           fi
           
           if [ -z "$JSON" ]; then
