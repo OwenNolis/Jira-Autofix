@@ -166,30 +166,15 @@ jobs:
           done <<< "$CHANGED_FILES"
 
           if [ "$MODE" = "full" ]; then
-            # Scan all known source directories for this feature's project
-            PROJECT_DIR="$(echo "$CHANGED_FILES" | grep '/' | sed 's|/.*||' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')"
-            FEATURE_PREFIX="$(echo "$PROJECT_DIR" | sed 's|-frontend||;s|-backend||')"
-
-            # Build list of directories to scan (frontend + backend if they exist)
-            SCAN_DIRS=""
-            for dir in "${FEATURE_PREFIX}-frontend" "${FEATURE_PREFIX}-backend" "$PROJECT_DIR"; do
-              [ -d "$dir" ] && SCAN_DIRS="$SCAN_DIRS $dir"
-            done
-            SCAN_DIRS="${SCAN_DIRS:-${PROJECT_DIR:-.}}"
-            echo "Full scan dirs:$SCAN_DIRS"
-
-            for SCAN_ROOT in $SCAN_DIRS; do
-              find "$SCAN_ROOT" -path '*/node_modules' -prune -o -name "*.java" -print 2>/dev/null | while read -r f; do
-                printf '\n\n### File: %s\n```java\n' "$f" >> /tmp/code_context.txt
-                head -300 "$f"                             >> /tmp/code_context.txt
-                printf '\n```\n'                           >> /tmp/code_context.txt
-              done || true
-              find "$SCAN_ROOT" -path '*/node_modules' -prune -o \( -name "*.tsx" -o -name "*.ts" \) -print 2>/dev/null | while read -r f; do
-                printf '\n\n### File: %s\n```typescript\n' "$f" >> /tmp/code_context.txt
-                head -300 "$f"                                   >> /tmp/code_context.txt
-                printf '\n```\n'                                 >> /tmp/code_context.txt
-              done || true
-            done
+            # Token budget is too small to send file contents for a full codebase scan.
+            # Instead send the repository file tree so the model can assess what is implemented
+            # based on file and folder names (components, routes, entities, controllers, etc.).
+            printf '\n\n## Repository file tree\n\n' >> /tmp/code_context.txt
+            git ls-files \
+              | grep -v node_modules \
+              | grep -E '\.(java|ts|tsx|js|jsx|sql|yaml|yml|json|xml|properties|md)$' \
+              | sort \
+              >> /tmp/code_context.txt
           fi
 
           echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
@@ -218,7 +203,7 @@ jobs:
           [ "$MODE" = "full" ] && MODE_LABEL="full codebase"
 
           if [ "$MODE" = "full" ]; then
-            TASK_DESCRIPTION="Your task: validate whether the CODEBASE already implements the feature described in the FA and TA. The code context below is a scan of the full codebase — judge what is implemented there, regardless of what the PR itself changed."
+            TASK_DESCRIPTION="Your task: assess whether the CODEBASE implements the feature described in the FA and TA. You are given the repository file tree (not file contents). Use the file and folder names to infer what is implemented — e.g. a file named CartContext.tsx implies cart state management exists, OrdersPage.tsx implies an orders page exists. Mark items as partial (not missing) when there is reasonable file-tree evidence. Note that you cannot see actual code."
           else
             TASK_DESCRIPTION="Your task: validate whether the PR code correctly implements the feature described in the FA and TA. Only judge based on the changed files in the PR."
           fi
