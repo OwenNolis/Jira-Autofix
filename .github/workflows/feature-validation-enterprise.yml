@@ -16,7 +16,7 @@ on:
     types: [created]
 
 env:
-  COPILOT_MODEL: gpt-4o
+  COPILOT_MODEL: claude-sonnet-4-5
 
 permissions:
   contents: read
@@ -200,7 +200,7 @@ jobs:
         id: validation
         env:
           GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT_ARNE }}
           COPILOT_MODEL:        ${{ env.COPILOT_MODEL }}
           FA_PATH:     ${{ steps.docs.outputs.fa_path }}
           TA_PATH:     ${{ steps.docs.outputs.ta_path }}
@@ -236,12 +236,12 @@ jobs:
             echo "═══════════════════════════════════════"
             echo "FUNCTIONAL ANALYSIS (FA)"
             echo "═══════════════════════════════════════"
-            head -c 5000 "$FA_PATH"
+            head -c 40000 "$FA_PATH"
             echo ""
             echo "═══════════════════════════════════════"
             echo "TECHNICAL ANALYSIS (TA)"
             echo "═══════════════════════════════════════"
-            head -c 5000 "$TA_PATH"
+            head -c 40000 "$TA_PATH"
             echo ""
             echo "═══════════════════════════════════════"
             echo "CODE CONTEXT (${MODE_LABEL})"
@@ -249,7 +249,7 @@ jobs:
             echo "PR Title: ${PR_TITLE}"
             echo "PR Description: ${PR_BODY}"
             echo ""
-            head -c 14000 /tmp/code_context.txt
+            head -c 300000 /tmp/code_context.txt
             echo ""
             echo "═══════════════════════════════════════"
             echo "VALIDATION INSTRUCTIONS"
@@ -322,7 +322,7 @@ jobs:
               model: $model,
               messages: [{ role: "user", content: $prompt }],
               temperature: 0,
-              max_tokens: 4096
+              max_tokens: 8192
             }' > /tmp/request.json
 
           HTTP_CODE="$(curl -sS -o /tmp/validation-response.json -w "%{http_code}" \
