@@ -16,7 +16,7 @@ on:
     types: [created]
 
 env:
-  COPILOT_MODEL: gpt-4-1
+  COPILOT_MODEL: gpt-4o
 
 permissions:
   contents: read
