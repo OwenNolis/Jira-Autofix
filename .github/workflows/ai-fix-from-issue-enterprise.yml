@@ -259,7 +259,7 @@ jobs:
           if [ -z "$JSON" ]; then
             echo "No JSON file changes found in Copilot output."
             echo "--- Copilot output (first 2000 chars) ---"
-            printf '%s' "$RAW" | head -c 2000
+            head -c 2000 /tmp/copilot-output.log
             echo "No files written." > /tmp/ai_analysis.txt
             exit 0
           fi
