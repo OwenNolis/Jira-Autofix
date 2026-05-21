@@ -1,12 +1,13 @@
-# Triggered when a GitHub issue is opened, gets the ai-fix label, someone comments /fix-ai, or dispatched directly with an issue number.
+# Triggered when an issue gets the ai-fix label, someone comments /fix-ai, or dispatched directly.
+# Uses Copilot CLI in agent mode — the agent reads files, writes fixes, and verifies the build itself.
 
-name: AI Fix from GitHub Issue
+name: AI Fix from GitHub Issue (Enterprise)
 
 on:
   issues:
-    types: [ labeled ]
+    types: [labeled]
   issue_comment:
-    types: [ created ]
+    types: [created]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -14,7 +15,7 @@ on:
         required: true
 
 env:
-  COPILOT_MODEL: claude-sonnet-4-6   # Change this to switch the AI model (e.g. gpt-4o, claude-sonnet-4-6)
+  COPILOT_MODEL: gpt-4.1
 
 concurrency:
   group: ai-fix-issue-enterprise-${{ github.event.inputs.issue_number || github.event.issue.number }}
@@ -24,10 +25,6 @@ jobs:
   ai-fix:
     runs-on: ubuntu-latest
 
-    # Run when:
-    #   • Dispatched directly with an issue number (jira-label-trigger), OR
-    #   • An issue was labeled with "ai-fix", OR
-    #   • A comment starts with "/fix-ai" on a real issue (not a PR)
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.label.name == 'ai-fix') ||
@@ -51,7 +48,6 @@ jobs:
       - name: Check dependencies
         run: |
           if ! command -v jq &>/dev/null; then
-            echo "jq not found, installing..."
             sudo apt-get install -y -qq jq
           fi
           jq --version
@@ -67,19 +63,17 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
             -d '{"content":"eyes"}' > /dev/null
 
-      - name: Build Copilot prompt from GitHub issue
-        id: build_prompt
+      - name: Fetch issue details and build agent prompt
+        id: issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Resolve issue number
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ISSUE_NUMBER="${{ github.event.inputs.issue_number }}"
           else
             ISSUE_NUMBER="${{ github.event.issue.number }}"
           fi
 
-          # Fetch full issue details
           ISSUE_JSON=$(curl -s \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
@@ -87,45 +81,27 @@ jobs:
 
           ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title // "Untitled"')
           ISSUE_BODY=$(echo "$ISSUE_JSON"  | jq -r '.body  // "No description."')
-
           JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-key: )[A-Z][A-Z0-9]*-[0-9]+(?= -->)' || true)
+          ISSUE_TYPE=$(echo "$ISSUE_BODY" | grep -i '| \*\*Type\*\*' | grep -oP '(?<=\| )[A-Za-z ]+(?= \|?\s*$)' | xargs || echo "Task")
 
           echo "number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
           echo "title=$ISSUE_TITLE"   >> $GITHUB_OUTPUT
           echo "jira_key=$JIRA_KEY"   >> $GITHUB_OUTPUT
 
-          # Extract Jira issue type from the issue body table
-          ISSUE_TYPE=$(echo "$ISSUE_BODY" | grep -i '| \*\*Type\*\*' | grep -oP '(?<=\| )[A-Za-z ]+(?= \|?\s*$)' | xargs || echo "Task")
-
-          # Build type-specific guidance for the prompt
+          # Derive commit type from issue type
           case "$(echo "$ISSUE_TYPE" | tr '[:upper:]' '[:lower:]')" in
-            *bug*)
-              TYPE_GUIDANCE="This is a BUG fix. Focus on the minimal change that corrects the broken behaviour. Do NOT refactor surrounding code or add unrelated improvements."
-              ;;
-            *story*|*feature*)
-              TYPE_GUIDANCE="This is a FEATURE request. Implement the new capability while preserving all existing behaviour. Consider how the new code integrates with existing components."
-              ;;
-            *refactor*)
-              TYPE_GUIDANCE="This is a REFACTOR. Restructure the code for clarity or performance but preserve all existing behaviour exactly. Do not change any functionality."
-              ;;
-            *doc*)
-              TYPE_GUIDANCE="This is a DOCUMENTATION update. Only update comments, README files, or documentation. Do not change any logic or functionality."
-              ;;
-            *test*)
-              TYPE_GUIDANCE="This is a TEST task. Add or update test files to cover the described scenario. Do not change production code unless a clear bug is discovered."
-              ;;
-            *)
-              TYPE_GUIDANCE="Implement the changes described in the issue with minimal impact on unrelated code."
-              ;;
+            *bug*)           COMMIT_TYPE="fix"      ; TYPE_GUIDANCE="This is a BUG fix. Make the minimal change that corrects the broken behaviour. Do not refactor surrounding code." ;;
+            *story*|*feat*)  COMMIT_TYPE="feat"     ; TYPE_GUIDANCE="This is a FEATURE request. Implement the new capability while preserving all existing behaviour." ;;
+            *refactor*)      COMMIT_TYPE="refactor" ; TYPE_GUIDANCE="This is a REFACTOR. Restructure code without changing any behaviour." ;;
+            *doc*)           COMMIT_TYPE="docs"     ; TYPE_GUIDANCE="This is a DOCUMENTATION update. Only update comments or docs, not logic." ;;
+            *test*)          COMMIT_TYPE="test"     ; TYPE_GUIDANCE="This is a TEST task. Add or update tests only." ;;
+            *)               COMMIT_TYPE="fix"      ; TYPE_GUIDANCE="Implement the changes described in the issue with minimal impact on unrelated code." ;;
           esac
+          echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
 
-          # Full file tree — model uses this to understand structure and locate files
-          FILE_TREE=$(git ls-files | grep -v node_modules | sort)
-
+          # Write the agent task prompt
           {
-            echo "IMPORTANT: Do NOT greet, do NOT ask questions, do NOT explain. Output ONLY a raw JSON object as described at the bottom of this prompt. Start your response with '{' and end with '}'."
-            echo ""
-            echo "You are an expert software engineer. Implement the fix for the GitHub issue below."
+            echo "You are an expert software engineer. Fix the GitHub issue below."
             echo ""
             echo "Repository: ${{ github.repository }}"
             echo "Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
@@ -134,66 +110,22 @@ jobs:
             echo "## Issue Description"
             echo "${ISSUE_BODY}"
             echo ""
-            echo "## Complete Repository File Tree"
-            echo "Use this to understand the project structure, infer naming conventions, locate relevant files, and write correct import paths."
-            printf '```\n%s\n```\n' "${FILE_TREE}"
+            echo "## Instructions"
+            echo "The repository is already checked out in the current working directory."
             echo ""
-            echo "## Step 1 — Analyse (think before you code)"
-            echo "Before writing any code, reason through the following:"
-            echo "1. What is the root cause or requirement described in the issue?"
-            echo "2. Which existing files are most relevant to this change?"
-            echo "3. What is the minimal set of changes needed?"
-            echo "4. Are there any side effects or related files that also need updating?"
-            echo "5. What patterns does the existing code follow? Look at: naming conventions"
-            echo "   (camelCase, PascalCase, kebab-case), component structure, import style,"
-            echo "   folder organisation, how state is managed, and how similar features are built."
-            echo "   Your new code must match these patterns exactly."
-            echo "Write this analysis as a brief comment inside the JSON output field 'analysis'."
-            echo ""
-            echo "## Step 2 — Write the code"
-            echo "Issue type: ${ISSUE_TYPE}"
-            echo "Guidance: ${TYPE_GUIDANCE}"
-            echo ""
-            echo "Now write the actual code changes based on your analysis above."
-            echo "- Preserve ALL existing functionality — do not remove or break any existing features."
-            echo "- Only add or modify what is needed to implement the fix."
-            echo "- Follow the existing code style and naming conventions exactly — look at how"
-            echo "  similar features are already implemented and use the same patterns, structure,"
-            echo "  and conventions. Do not introduce a new pattern if one already exists."
-            echo "- IMPORTANT: Always prefer modifying an existing file over creating a new one."
-            echo "  Before creating any new file, check whether the code logically belongs in an"
-            echo "  existing file. Only create a new file if no existing file is a reasonable fit."
-            echo "- If you create a new component, also import and use it in the relevant parent file."
-            echo "- If you need an npm package that is NOT already in package.json, add it to the"
-            echo "  'dependencies' section of the relevant package.json with an appropriate version."
-            echo "- IMPORTANT: Never import a package that is not listed in package.json."
-            echo "- IMPORTANT: When using third-party CSS that references local image files (e.g. leaflet),"
-            echo "  do NOT import it via JS/TS. Instead add a CDN <link> tag to the HTML entry point"
-            echo "  for this project (find the correct index.html by reading the repository)."
-            echo ""
-            echo "## REQUIRED OUTPUT FORMAT"
-            echo "Output ONLY a raw JSON object — no greeting, no explanation, no markdown fences."
-            echo "Start your response with '{' and end with '}'. Nothing before or after."
-            echo ""
-            echo "{\"type\": \"fix\", \"analysis\": \"brief explanation of what changed and why\", \"files\": [{\"path\": \"src/example.ts\", \"content\": \"// full file content here\"}, {\"path\": \"src/example.css\", \"content\": \"/* full file content */\"}]}"
-            echo ""
-            echo "Rules for the JSON:"
-            echo "- 'analysis': 2-3 sentences summarising what you changed and why, based on your Step 1 reasoning"
-            echo "- 'type': conventional commit type based on the nature of your changes:"
-            echo "    fix      — bug fix or correcting broken behaviour"
-            echo "    feat     — new feature or new capability added"
-            echo "    refactor — code restructure with no behaviour change"
-            echo "    style    — formatting, whitespace, or CSS-only changes"
-            echo "    chore    — config, tooling, or dependency updates"
-            echo "    docs     — documentation only"
-            echo "    test     — adding or updating tests"
-            echo "- 'path': relative path from repo root matching a file from the tree above (or new file path)"
-            echo "- 'content': the COMPLETE updated file — not a diff, not a snippet, the whole file"
-            echo "- Only include files you actually changed"
-            echo "- Output nothing before or after the JSON object"
-          } > copilot-prompt.txt
-          
-          echo "Prompt written ($(wc -l < copilot-prompt.txt) lines, $(wc -c < copilot-prompt.txt) bytes)"
+            echo "1. Explore the codebase first — read relevant files to understand the structure,"
+            echo "   naming conventions, how similar features are implemented, and what packages are available."
+            echo "2. Implement the fix following the existing code style exactly."
+            echo "3. Only change what is needed — preserve all existing functionality."
+            echo "4. Always prefer modifying an existing file over creating a new one."
+            echo "5. If you create a new component, import and use it in the relevant parent file."
+            echo "6. Never import a package that is not in package.json."
+            echo "7. After making changes, verify the build compiles (run npm install && npm run build"
+            echo "   in the project directory). If the build fails, fix the errors before finishing."
+            echo "8. Do NOT create a git commit — only make the file changes."
+          } > /tmp/agent-prompt.txt
+
+          echo "Agent prompt written ($(wc -l < /tmp/agent-prompt.txt) lines)"
 
       - name: Cache Copilot CLI
         uses: actions/cache@v4
@@ -206,132 +138,57 @@ jobs:
         if: steps.cache-copilot.outputs.cache-hit != 'true'
         run: curl -fsSL https://gh.io/copilot-install | bash
 
-      - name: Run Copilot and capture output
+      - name: Run Copilot agent
         id: ai_fix
         timeout-minutes: 60
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          # Cap output at 5MB to guard against runaway responses
-          # || true suppresses the SIGPIPE error (exit 141) that head -c sends back
-          # to the copilot process when the limit is reached
-          copilot -p "$(cat copilot-prompt.txt)" \
+
+          copilot -p "$(cat /tmp/agent-prompt.txt)" \
             --model "$COPILOT_MODEL" \
             --no-ask-user \
-            2>&1 | head -c 5242880 | tee /tmp/copilot-output.log || true
+            2>&1 | tee /tmp/copilot-output.log || true
 
           COPILOT_EXIT=${PIPESTATUS[0]}
-          # 141 = 128+13 = SIGPIPE, expected when head -c truncates — not a real failure
+          # 141 = SIGPIPE from head -c truncation — not a real failure
           if [ "$COPILOT_EXIT" -ne 0 ] && [ "$COPILOT_EXIT" -ne 141 ]; then
-            echo "::error::Copilot CLI failed — check COPILOT_PAT secret and CLI flags"
+            echo "::error::Copilot CLI failed — check COPILOT_PAT secret and model name"
             exit 1
           fi
 
-          OUTPUT_BYTES=$(wc -c < /tmp/copilot-output.log)
-          echo "Output size: ${OUTPUT_BYTES} bytes"
-          if [ "$OUTPUT_BYTES" -ge 5242880 ]; then
-            echo "::warning::Output was truncated at 5MB — response may be incomplete"
-          fi
-
-          echo "=== Raw Copilot output ==="
+          echo "=== Copilot agent output ==="
           cat /tmp/copilot-output.log
-
-      - name: Apply AI-generated file changes
-        id: apply_changes
-        run: |
-          # The Copilot CLI appends metadata lines (Changes/Requests/Tokens) after
-          # the model output, so we can't parse the full log as JSON directly.
-          # Use awk to find the first line starting with '{' and the last line
-          # that is '}', then extract that range and validate with jq.
-          START=$(awk '/^\{/{print NR; exit}' /tmp/copilot-output.log)
-          END=$(awk '/^\}/{line=NR} END{print line}' /tmp/copilot-output.log)
-          JSON=""
-          if [ -n "$START" ] && [ -n "$END" ] && [ "$END" -ge "$START" ]; then
-            JSON=$(sed -n "${START},${END}p" /tmp/copilot-output.log \
-              | jq -e 'select(has("files"))' 2>/dev/null || true)
-          fi
-          # Fallback: try the whole file as-is
-          if [ -z "$JSON" ]; then
-            JSON=$(jq -e 'select(has("files"))' /tmp/copilot-output.log 2>/dev/null || true)
-          fi
-          
-          if [ -z "$JSON" ]; then
-            echo "No JSON file changes found in Copilot output."
-            echo "--- Copilot output (first 2000 chars) ---"
-            head -c 2000 /tmp/copilot-output.log
-            echo "No files written." > /tmp/ai_analysis.txt
-            exit 0
-          fi
-          
-          FILE_COUNT=$(printf '%s' "$JSON" | jq '.files | length')
-          if [ "$FILE_COUNT" -eq 0 ]; then
-            echo "JSON parsed but no files listed."
-            echo "No files written." > /tmp/ai_analysis.txt
-            exit 0
-          fi
-          
-          WRITTEN=""
-          while IFS= read -r entry; do
-            PATH_VAL=$(printf '%s' "$entry" | jq -r '.path // "" | ltrimstr(" ") | rtrimstr(" ")')
-            [ -z "$PATH_VAL" ] && continue
-          
-            case "$PATH_VAL" in
-              /*|../*|*/../*|*/..| ..|.git|.git/*|.github/workflows|.github/workflows/*)
-                echo "Skipping unsafe path: $PATH_VAL"
-                continue
-                ;;
-            esac
-            mkdir -p "$(dirname "$PATH_VAL")"
-            printf '%s' "$entry" | jq -rj '.content // ""' > "$PATH_VAL"
-            echo "Wrote: $PATH_VAL"
-            WRITTEN="${WRITTEN:+$WRITTEN, }$PATH_VAL"
-          done < <(printf '%s' "$JSON" | jq -c '.files[]')
-          
-          # Use the AI's own analysis field if provided, otherwise fall back to file list
-          AI_ANALYSIS=$(printf '%s' "$JSON" | jq -r '.analysis // ""')
-          if [ -n "$AI_ANALYSIS" ]; then
-            echo "$AI_ANALYSIS" > /tmp/ai_analysis.txt
-          elif [ -n "$WRITTEN" ]; then
-            echo "AI applied changes to: $WRITTEN" > /tmp/ai_analysis.txt
-          else
-            echo "No files written." > /tmp/ai_analysis.txt
-          fi
-          echo "Total files written: $FILE_COUNT"
-
-          COMMIT_TYPE=$(printf '%s' "$JSON" | jq -r '.type // "fix"')
-          # Validate — fall back to "fix" if the AI returns something unexpected
-          case "$COMMIT_TYPE" in
-            fix|feat|refactor|style|chore|docs|test) ;;
-            *) COMMIT_TYPE="fix" ;;
-          esac
-          echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
-
-          # Derive scope from the first folder segment of each changed file path
-          # Only consider paths that have a subfolder (contain '/'); root-level files are skipped
-          SCOPE=$(echo "$WRITTEN" | tr ',' '\n' | sed 's/^ *//' | \
-            grep '/' | \
-            while IFS= read -r f; do echo "$f" | cut -d'/' -f1; done | \
-            grep -v '^$' | sort -u | head -1)
-          [ -z "$SCOPE" ] && SCOPE="jira-ai"
-          echo "scope=$SCOPE" >> $GITHUB_OUTPUT
 
       - name: Check for changes
         id: check_changes
         run: |
-          # Remove the prompt file so it never ends up in the PR
-          rm -f copilot-prompt.txt
-          
+          CHANGED=$(git diff --name-only)
           UNTRACKED=$(git ls-files --others --exclude-standard)
-          if git diff --quiet && git diff --staged --quiet && [ -z "$UNTRACKED" ]; then
+
+          if [ -z "$CHANGED" ] && [ -z "$UNTRACKED" ]; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "No file changes produced"
+            echo "No file changes produced by the agent."
           else
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "=== Modified files ==="
-            git diff --name-only
-            echo "=== Untracked files ==="
+            echo "$CHANGED"
+            echo "=== New files ==="
             echo "$UNTRACKED"
+
+            # Derive scope from first folder segment of changed files
+            SCOPE=$(printf '%s\n%s' "$CHANGED" "$UNTRACKED" \
+              | grep '/' | sed 's|/.*||' | sort -u | head -1)
+            [ -z "$SCOPE" ] && SCOPE="jira-ai"
+            echo "scope=$SCOPE" >> $GITHUB_OUTPUT
+
+            # Build analysis summary from changed files
+            ALL_CHANGED=$(printf '%s\n%s' "$CHANGED" "$UNTRACKED" \
+              | grep -v '^$' | awk '{printf "- `%s`\n", $0}')
+            echo "AI agent applied changes to fix the issue." > /tmp/ai_analysis.txt
+            echo "" >> /tmp/ai_analysis.txt
+            echo "$ALL_CHANGED" >> /tmp/ai_analysis.txt
           fi
 
       - name: Create pull request with AI fixes
@@ -339,80 +196,77 @@ jobs:
         id: create_pr
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_PAT }}
-          ISSUE_NUMBER: ${{ steps.build_prompt.outputs.number }}
-          ISSUE_TITLE: ${{ steps.build_prompt.outputs.title }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
           JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
         run: |
           git config --global user.name "AI Issue Fixer"
           git config --global user.email "ai-fixer@github.com"
 
-          JIRA_KEY="${{ steps.build_prompt.outputs.jira_key }}"
+          JIRA_KEY="${{ steps.issue.outputs.jira_key }}"
+          COMMIT_TYPE="${{ steps.issue.outputs.commit_type }}"
+          SCOPE="${{ steps.check_changes.outputs.scope }}"
 
-          # Create a branch using the Jira key
           if [ -z "$JIRA_KEY" ]; then
             echo "❌ No Jira key found in issue body — cannot create branch"
             exit 1
           fi
+
           BRANCH="feature/${JIRA_KEY}"
           git checkout -b "$BRANCH"
-
           git add -A
 
-          # Commit — include "Fixes #N" so GitHub auto-closes the issue on merge
-          COMMIT_TYPE="${{ steps.apply_changes.outputs.commit_type }}"
-          SCOPE="${{ steps.apply_changes.outputs.scope }}"
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "AI-generated code changes")
-          COMMIT_MSG=$(printf '%s: AI-generated fix for issue #%s\n\nFixes #%s\nJira: %s\n\n%s' \
-            "$COMMIT_TYPE" "$ISSUE_NUMBER" "$ISSUE_NUMBER" "$JIRA_KEY" "$ANALYSIS")
+          COMMIT_MSG=$(printf '%s(%s): AI-generated fix for issue #%s\n\nFixes #%s\nJira: %s\n\n%s' \
+            "$COMMIT_TYPE" "$SCOPE" "$ISSUE_NUMBER" "$ISSUE_NUMBER" "$JIRA_KEY" "$ANALYSIS")
           git commit -m "$COMMIT_MSG"
 
           git push origin --delete "$BRANCH" 2>/dev/null || true
           git push --force origin "$BRANCH"
 
-          # Build PR title and body
           CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
           PR_TITLE="${COMMIT_TYPE}(${SCOPE}): ${JIRA_KEY} - ${CLEAN_TITLE}"
           CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | awk 'NF{printf "- `%s`\n", $0}')
           JIRA_DOMAIN_CLEAN="${JIRA_DOMAIN%/}"
-          
+
           JIRA_LINE=""
           if [ -n "$JIRA_KEY" ] && [ -n "$JIRA_DOMAIN_CLEAN" ]; then
             JIRA_LINE="**Jira:** [${JIRA_KEY}](https://${JIRA_DOMAIN_CLEAN}/browse/${JIRA_KEY})"
           elif [ -n "$JIRA_KEY" ]; then
             JIRA_LINE="**Jira:** ${JIRA_KEY}"
           fi
-          
+
           PR_BODY=$(jq -rn \
-            --arg issue   "$ISSUE_NUMBER" \
-            --arg jira    "$JIRA_LINE" \
+            --arg issue    "$ISSUE_NUMBER" \
+            --arg jira     "$JIRA_LINE" \
             --arg analysis "$ANALYSIS" \
             --arg changed  "$CHANGED_FILES" \
             --arg jira_key "$JIRA_KEY" \
-            --arg title   "$CLEAN_TITLE" \
-            --arg model   "$COPILOT_MODEL" \
+            --arg title    "$CLEAN_TITLE" \
+            --arg model    "$COPILOT_MODEL" \
             '(if $jira_key != "" then "## 🤖 AI-Generated Fix — Refs:" + $jira_key + " - " + $title else "## 🤖 AI-Generated Fix" end) +
-             "\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot (" + $model + ")" +
+             "\n\n**GitHub issue:** #" + $issue + "\n**AI provider:** GitHub Copilot agent (" + $model + ")" +
              (if $jira != "" then "\n" + $jira else "" end) +
              "\n\n### Analysis\n" + $analysis +
              "\n\n### Changed Files\n" + $changed +
              "\n\n---\nFixes #" + $issue +
              (if $jira_key != "" then "\nRefs: " + $jira_key else "" end) +
              (if $jira_key != "" then "\n<!-- jira-key: " + $jira_key + " -->" else "" end)')
-          
+
           PR_BODY_JSON=$(printf '%s' "$PR_BODY" | jq -Rs '.')
           PR_TITLE_JSON=$(printf '%s' "$PR_TITLE" | jq -Rs '.')
-          
+
           PR_RESPONSE=$(curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/pulls" \
             -d "{\"title\": ${PR_TITLE_JSON}, \"body\": ${PR_BODY_JSON}, \"head\": \"${BRANCH}\", \"base\": \"${{ github.event.repository.default_branch }}\"}")
-          
+
           PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number // empty')
-          PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // empty')
-          
+          PR_URL=$(echo "$PR_RESPONSE"    | jq -r '.html_url // empty')
+
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr_url=$PR_URL"     >> $GITHUB_OUTPUT
+          echo "pr_url=$PR_URL"       >> $GITHUB_OUTPUT
           echo "✅ PR #${PR_NUMBER} created: $PR_URL"
 
       - name: Comment on issue with PR link
@@ -421,25 +275,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ANALYSIS=$(cat /tmp/ai_analysis.txt 2>/dev/null || echo "See PR for details.")
-          JIRA_KEY="${{ steps.build_prompt.outputs.jira_key }}"
-          CLEAN_TITLE=$(echo "${{ steps.build_prompt.outputs.title }}" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
+          JIRA_KEY="${{ steps.issue.outputs.jira_key }}"
+          CLEAN_TITLE=$(echo "${{ steps.issue.outputs.title }}" | sed 's/^\[[A-Z][A-Z0-9]*-[0-9]\+\][[:space:]]*//')
           if [ -n "$JIRA_KEY" ]; then
             HEADER="🤖 **AI-Generated Fix — Refs:${JIRA_KEY} - ${CLEAN_TITLE}**"
           else
             HEADER="🤖 **AI-Generated Fix**"
           fi
-          COMMENT=$(printf '%s\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed. (Only if close-on-merge workflow gets added with needed credentials)' \
-            "$HEADER" \
-            "$ANALYSIS" \
-            "${{ steps.create_pr.outputs.pr_url }}")
-          
-          COMMENT_JSON=$(jq -n --arg body "$COMMENT" '{"body": $body}')
-          
+          COMMENT=$(printf '%s\n\n**Analysis:** %s\n\n**Pull Request:** %s\n\nOnce merged, this GitHub issue and the linked Jira issue will be automatically closed.' \
+            "$HEADER" "$ANALYSIS" "${{ steps.create_pr.outputs.pr_url }}")
+
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.build_prompt.outputs.number }}/comments" \
-            -d "$COMMENT_JSON"
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.issue.outputs.number }}/comments" \
+            -d "$(jq -n --arg body "$COMMENT" '{"body": $body}')"
 
       - name: Comment when no changes were produced
         if: steps.check_changes.outputs.has_changes == 'false'
@@ -449,6 +299,5 @@ jobs:
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.build_prompt.outputs.number }}/comments" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.issue.outputs.number }}/comments" \
             -d '{"body":"🤖 **AI Analysis Complete** — No code changes were identified for this issue. Provide more detail or use `/fix-ai <extra context>` to give the AI more guidance."}'
- 
