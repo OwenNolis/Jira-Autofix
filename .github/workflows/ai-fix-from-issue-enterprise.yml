@@ -123,6 +123,17 @@ jobs:
             echo "7. After making changes, verify the build compiles (run npm install && npm run build"
             echo "   in the project directory). If the build fails, fix the errors before finishing."
             echo "8. Do NOT create a git commit — only make the file changes."
+            echo ""
+            echo "## Critical checks before finishing"
+            echo "- Read every file you import or reference. If a file exists but contains only a stub,"
+            echo "  placeholder, or empty component (e.g. just 'export default function X() { return null }'),"
+            echo "  you MUST implement it fully — do not leave stubs behind."
+            echo "- If the issue asks for a new page or feature, verify it actually renders meaningful content,"
+            echo "  not just an empty shell. Check that data is fetched, displayed, and any required actions"
+            echo "  (e.g. add to cart) are wired up."
+            echo "- Look at similar existing pages/components in the codebase and follow the same patterns"
+            echo "  for API calls, state management, and styling."
+            echo "- A route that points to a blank component is not a fix — the component must be complete."
           } > /tmp/agent-prompt.txt
 
           echo "Agent prompt written ($(wc -l < /tmp/agent-prompt.txt) lines)"
