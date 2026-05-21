@@ -9,6 +9,7 @@ import PipelineRunDashboard from './components/PipelineRunDashboard';
 import IssuesPage from './components/IssuesPage';
 import Settings from './components/Settings';
 import Notifications from './components/Notifications';
+import ProductDetailPage from './pages/ProductDetailPage';
 
 // --- Toast Notification System ---
 interface Toast {
@@ -358,6 +359,10 @@ function AppContent() {
         <Route
           path="/settings"
           element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/product/:id"
+          element={isAuthenticated ? <ProductDetailPage /> : <Navigate to="/login" />}
         />
         <Route
           path="/"
