@@ -22,7 +22,7 @@ export default function ProductCard({ product }: Props) {
   }
 
   return (
-    <div className="product-card" onClick={() => navigate(`/products/${product.id}`)}>
+    <div className="product-card" onClick={() => navigate(`/product/${product.id}`)}>
       <div className="product-card-img-wrap">
         <img src={product.imageUrl} alt={product.name} className="product-card-img" />
         <span className={`stock-badge stock-badge--${stockStatus === 'Op voorraad' ? 'ok' : stockStatus === 'Beperkt' ? 'low' : 'out'}`}>
