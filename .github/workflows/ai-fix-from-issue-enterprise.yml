@@ -162,6 +162,18 @@ jobs:
             echo "- Before writing any new hook, helper, or utility function, search the codebase"
             echo "  for an existing one that does the same thing (e.g. useCart, useAuth, api.ts)."
             echo "  Use the existing utility. Only create a new one if nothing equivalent exists."
+            echo ""
+            echo "Type safety:"
+            echo "- Before importing ANY type from a shared types file (e.g. types.ts, models.ts),"
+            echo "  READ that file first and confirm the type is actually exported from it."
+            echo "  Never import a type you have not seen with your own eyes in that file."
+            echo "- Before accessing a property on a typed object (e.g. product.stock, cart.items),"
+            echo "  read the type definition and confirm the property exists on that type."
+            echo "- If a type is missing a field you need, ADD the field to the type definition"
+            echo "  rather than assuming it exists. Keep the type and all usages consistent."
+            echo "- Never use 'any' as a type — use or extend existing types."
+            echo "- After ALL changes are made, run the build and fix every TypeScript error"
+            echo "  before considering the task done."
           } > /tmp/agent-prompt.txt
 
           echo "Agent prompt written ($(wc -l < /tmp/agent-prompt.txt) lines)"
