@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import '../pages/ProductDetailPage.css';
+import './ProductDetailPage.css';
 import { useCart } from '../contexts/CartContext';
 import { Product } from '../types';
 
@@ -17,7 +17,7 @@ function ProductDetailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addQty, setAddQty] = useState(1);
-  const { addToCart } = useCart();
+  const { addItem } = useCart();
   const [added, setAdded] = useState(false);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (!product) return;
-    addToCart(product, addQty);
+    addItem(product, addQty);
     setAdded(true);
     setTimeout(() => setAdded(false), 1200);
   };
