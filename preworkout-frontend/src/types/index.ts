@@ -1,6 +1,6 @@
 export interface Product {
   id: number;
-  categoryId: number;
+  categoryId?: number;
   name: string;
   description: string;
   price: number;
@@ -20,7 +20,7 @@ export interface CartItem {
   id: number;
   userId?: number;
   productId: number;
-  product?: Product;
+  product: Product;
   quantity: number;
   flavor: string;
 }
