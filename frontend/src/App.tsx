@@ -19,9 +19,11 @@ interface Toast {
   duration?: number; // ms
 }
 
-const ToastContext = React.createContext<{
+type ToastContextType = {
   showToast: (message: string, type?: Toast['type'], duration?: number) => void;
-} | undefined>(undefined);
+};
+
+const ToastContext = React.createContext<ToastContextType | undefined>(undefined);
 
 function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -77,7 +79,12 @@ const COLOR_PALETTE = [
   { name: 'Gray', value: '#23272f' },
 ];
 
-function ColorPalette({ currentColor, onChange }: { currentColor: string; onChange: (color: string) => void }) {
+type ColorPaletteProps = {
+  currentColor: string;
+  onChange: (color: string) => void;
+};
+
+function ColorPalette({ currentColor, onChange }: ColorPaletteProps) {
   return (
     <div className="color-palette-navbar" title="Change navbar color">
       {COLOR_PALETTE.map((c) => (
@@ -190,7 +197,7 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
           {isDarkMode ? <SunIcon /> : <MoonIcon />}
         </button>
         {isAuthenticated && (
-          <div className="avatar-menu" ref={avatarMenuRef}>
+          <div className="avatar-menu" ref={avatarMenuRef as React.RefObject<HTMLDivElement>}>
             <img
               src="/Hessi.png"
               alt="User Avatar"
@@ -198,7 +205,7 @@ function NavigationBar({ isDarkMode, handleToggleDarkMode, isAuthenticated, hand
               onClick={toggleAvatarMenu}
             />
             {/* Use local horn.mp3 instead of remote sound */}
-            <audio ref={audioRef} src="/horn.mp3" preload="auto" />
+            <audio ref={audioRef as React.RefObject<HTMLAudioElement>} src="/horn.mp3" preload="auto" />
             {isAvatarMenuOpen && (
               <div className="dropdown-menu">
                 <button onClick={handleLogout}>Logout</button>
@@ -230,7 +237,7 @@ function AppContent() {
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Toast context
   const { showToast } = useToast();
