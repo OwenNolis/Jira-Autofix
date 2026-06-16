@@ -61,6 +61,7 @@ export interface AuthResponse {
 export interface ProductFilters {
   search: string;
   flavor: string;
+  category: string;
   minPrice: number | null;
   maxPrice: number | null;
   inStock: boolean;
