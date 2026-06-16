@@ -1,5 +1,5 @@
 import React from 'react';
-import { flavors } from '../data/mockData';
+import { categories, flavors } from '../data/mockData';
 import { ProductFilters } from '../types';
 import './FilterSidebar.css';
 
@@ -26,6 +26,20 @@ export default function FilterSidebar({ filters, onChange, onReset }: Props) {
           value={filters.search}
           onChange={(e) => onChange({ search: e.target.value })}
         />
+      </div>
+
+      <div className="filter-group">
+        <label className="filter-label">Categorie</label>
+        <select
+          className="filter-select"
+          value={filters.category}
+          onChange={(e) => onChange({ category: e.target.value })}
+        >
+          <option value="">Alle categorieën</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
 
       <div className="filter-group">

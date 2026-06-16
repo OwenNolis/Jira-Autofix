@@ -8,6 +8,7 @@ import './HomePage.css';
 const DEFAULT_FILTERS: ProductFilters = {
   search: '',
   flavor: '',
+  category: '',
   minPrice: null,
   maxPrice: null,
   inStock: false,
@@ -32,6 +33,7 @@ export default function HomePage() {
         (p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
       );
     }
+    if (filters.category) result = result.filter((p) => p.category === filters.category);
     if (filters.flavor) result = result.filter((p) => p.flavor === filters.flavor);
     if (filters.minPrice != null) result = result.filter((p) => p.price >= filters.minPrice!);
     if (filters.maxPrice != null) result = result.filter((p) => p.price <= filters.maxPrice!);

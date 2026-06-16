@@ -88,3 +88,5 @@ export const mockProducts: Product[] = [
 ];
 
 export const flavors = ['Peach', 'Mango', 'Blueberry', 'Cherry', 'Watermelon', 'Lemon'];
+
+export const categories = ['Pre-Workout', 'Pump Formula', 'Hydration'];
