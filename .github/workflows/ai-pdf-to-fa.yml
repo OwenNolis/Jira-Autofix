@@ -111,7 +111,7 @@ jobs:
 
       - name: Run PDF to FA conversion
         env:
-          GITHUB_TOKEN: ${{ secrets.COPILOT_PAT_ARNE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
           FEATURE_ID: ${{ steps.parse.outputs.feature_id }}
         run: |
