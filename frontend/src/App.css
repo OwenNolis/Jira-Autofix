@@ -1,6 +1,6 @@
 /* Theme variables */
 :root {
-  --color-bg: #f5f5f5;
+  --color-bg: #f0f4ff;
   --color-text: #222;
   --color-nav: #007bff;
   --color-nav-link: #fff;
@@ -27,6 +27,9 @@
   --color-jira-type-bug: #e53935;
   --color-jira-type-task: #007bff;
   --color-jira-type-story: #4caf50;
+  --color-bg-gradient-start: #e8f0fe;
+  --color-bg-gradient-mid: #f0e6ff;
+  --color-bg-gradient-end: #e6f9f0;
 }
 
 /* --- Toast Notification Styles --- */
@@ -112,6 +115,13 @@
   color: var(--color-text);
   min-height: 100vh;
   transition: background 0.2s, color 0.2s;
+  background-image: linear-gradient(
+    135deg,
+    var(--color-bg-gradient-start) 0%,
+    var(--color-bg-gradient-mid) 50%,
+    var(--color-bg-gradient-end) 100%
+  );
+  background-attachment: fixed;
 }
 
 /* --- Clock Widget Styles --- */
@@ -262,6 +272,9 @@ body.dark {
   --color-jira-type-bug: #ff6b6b;
   --color-jira-type-task: #90caf9;
   --color-jira-type-story: #4caf50;
+  --color-bg-gradient-start: #1a1d2e;
+  --color-bg-gradient-mid: #1e1a2e;
+  --color-bg-gradient-end: #1a2e1e;
 }
 
 /* --- UI Cleanliness & Professionalism Enhancements --- */
@@ -897,3 +910,46 @@ button, input, select, textarea {
   font-size: 1rem;
 }
 
+/* --- Animated background orbs for visual interest --- */
+.App::before {
+  content: '';
+  position: fixed;
+  top: -120px;
+  left: -120px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(100,160,255,0.18) 0%, rgba(100,160,255,0) 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: orb-drift-1 18s ease-in-out infinite alternate;
+}
+.App::after {
+  content: '';
+  position: fixed;
+  bottom: -100px;
+  right: -100px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(180,100,255,0.15) 0%, rgba(180,100,255,0) 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: orb-drift-2 22s ease-in-out infinite alternate;
+}
+@keyframes orb-drift-1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(60px, 40px) scale(1.08); }
+  100% { transform: translate(20px, 80px) scale(0.95); }
+}
+@keyframes orb-drift-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(-50px, -30px) scale(1.1); }
+  100% { transform: translate(-20px, -70px) scale(0.92); }
+}
+.App.dark::before {
+  background: radial-gradient(circle, rgba(60,80,180,0.22) 0%, rgba(60,80,180,0) 70%);
+}
+.App.dark::after {
+  background: radial-gradient(circle, rgba(120,40,180,0.18) 0%, rgba(120,40,180,0) 70%);
+}
