@@ -33,6 +33,7 @@ export default function Navbar() {
           {user ? (
             <>
               <li><Link to="/orders" onClick={() => setMenuOpen(false)}>Mijn Bestellingen</Link></li>
+              <li><Link to="/account" onClick={() => setMenuOpen(false)}>Mijn Account</Link></li>
               {user.role === 'Admin' && (
                 <li><Link to="/admin" onClick={() => setMenuOpen(false)}>Admin</Link></li>
               )}
