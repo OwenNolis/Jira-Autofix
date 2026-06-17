@@ -30,6 +30,7 @@ export default function Navbar() {
 
         <ul className={`navbar-links ${menuOpen ? 'open' : ''}`}>
           <li><Link to="/" onClick={() => setMenuOpen(false)}>Shop</Link></li>
+          <li><Link to="/contact" onClick={() => setMenuOpen(false)}>Contact</Link></li>
           {user ? (
             <>
               <li><Link to="/orders" onClick={() => setMenuOpen(false)}>Mijn Bestellingen</Link></li>
