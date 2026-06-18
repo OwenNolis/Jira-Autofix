@@ -124,6 +124,42 @@
   background-attachment: fixed;
 }
 
+/* --- Primary Save Button Styles --- */
+.primary-save-btn {
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 32px;
+  font-size: 1.13rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,123,255,0.10);
+  cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.08s;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  letter-spacing: 0.5px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.primary-save-btn:focus {
+  outline: 2.5px solid #ffd700;
+}
+.primary-save-btn:hover, .primary-save-btn:active {
+  background: linear-gradient(90deg, #0056b3 0%, #007bff 100%);
+  box-shadow: 0 4px 16px rgba(0,123,255,0.18);
+  transform: translateY(-1px) scale(1.03);
+}
+.primary-save-btn .save-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 1.3em;
+  height: 1.3em;
+  margin-right: 2px;
+}
+
 /* --- Clock Widget Styles --- */
 .navbar-clock-widget {
   color: #fff;
