@@ -152,6 +152,40 @@ const MoonIcon = () => (
   </svg>
 );
 
+// --- ChatbotIconButton component ---
+function ChatbotIconButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="chatbot-fab"
+        aria-label="Open chatbot"
+        title="Chatbot (coming soon)"
+        onClick={() => setOpen((v) => !v)}
+        style={{ zIndex: 5000 }}
+      >
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="14" fill="#007bff" />
+          <ellipse cx="16" cy="19" rx="8" ry="5" fill="#fff" />
+          <ellipse cx="16" cy="14" rx="10" ry="7" fill="#fff" />
+          <ellipse cx="12.5" cy="14.5" rx="1.5" ry="2" fill="#007bff" />
+          <ellipse cx="19.5" cy="14.5" rx="1.5" ry="2" fill="#007bff" />
+          <rect x="13" y="18" width="6" height="2" rx="1" fill="#007bff" />
+        </svg>
+      </button>
+      {open && (
+        <div className="chatbot-modal-overlay" onClick={() => setOpen(false)}>
+          <div className="chatbot-modal" onClick={e => e.stopPropagation()}>
+            <button className="chatbot-modal-close" onClick={() => setOpen(false)} aria-label="Close chatbot">×</button>
+            <div style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: 12 }}>Chatbot (Coming Soon)</div>
+            <div style={{ color: '#888', fontSize: '1.05rem' }}>A helpful assistant will appear here in a future update.</div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 interface NavigationBarProps {
   isDarkMode: boolean;
   handleToggleDarkMode: () => void;
@@ -386,6 +420,8 @@ function AppContent() {
           }
         />
       </Routes>
+      {/* Chatbot floating action button (bottom right) */}
+      {isAuthenticated && <ChatbotIconButton />}
     </div>
   );
 }
